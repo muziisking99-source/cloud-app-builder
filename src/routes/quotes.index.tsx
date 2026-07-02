@@ -22,7 +22,7 @@ function QuotesPage() {
     const { data: user } = await supabase.auth.getUser();
     const { data: inv, error } = await supabase.from("documents").insert({
       doc_type: "invoice",
-      doc_number: numData,
+      doc_number: numData as string,
       parent_id: quote.id,
       customer_name: quote.customer_name,
       customer_email: quote.customer_email,
