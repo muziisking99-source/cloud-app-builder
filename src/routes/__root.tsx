@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -11,6 +12,10 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "../components/ui/sonner";
+import { ConfirmProvider } from "../components/ConfirmDialog";
+import { AuthProvider } from "../lib/auth";
+import { AppShell } from "../components/AppShell";
 
 function NotFoundComponent() {
   return (
@@ -120,8 +125,26 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <ConfirmProvider>
+        <AuthProvider>
+          <ShellGate />
+        </AuthProvider>
+      </ConfirmProvider>
+      <Toaster position="top-right" closeButton />
     </QueryClientProvider>
+  );
+}
+
+/**
+ * Mounts the persistent app shell (sidebar + top bar) once so it survives route
+ * changes. The login page renders bare. Removing <Outlet /> breaks child routes.
+ */
+function ShellGate() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/auth") return <Outlet />;
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 }

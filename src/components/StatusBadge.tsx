@@ -24,7 +24,8 @@ export function StatusBadge({ status }: { status: string }) {
   const label = status.replace(/_/g, " ");
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition-colors"
+      key={status}
+      className="badge-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition-colors"
       style={{ backgroundColor: c.bg, color: c.fg }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c.dot }} />

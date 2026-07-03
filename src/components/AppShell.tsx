@@ -1,7 +1,7 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { useDocuments, useProfile } from "@/lib/queries";
 import {
   LayoutDashboard,
   FileText,
@@ -28,9 +28,18 @@ export function AppShell({ children }: { children?: ReactNode }) {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [profileName, setProfileName] = useState<string>("");
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const { data: docs } = useDocuments(!!user);
+  const { data: profile } = useProfile(user?.id);
+  const profileName = profile?.name ?? user?.email ?? "";
+  const roleLabel = profile?.role === "admin" ? "Administrator" : "Factory Staff";
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    (docs ?? []).forEach((d: any) => (c[d.doc_type] = (c[d.doc_type] ?? 0) + 1));
+    return c;
+  }, [docs]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -40,29 +49,26 @@ export function AppShell({ children }: { children?: ReactNode }) {
     if (!loading && !user) navigate({ to: "/auth" });
   }, [user, loading, navigate]);
 
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("documents")
-      .select("doc_type")
-      .then(({ data }) => {
-        if (!data) return;
-        const c: Record<string, number> = {};
-        data.forEach((d: any) => (c[d.doc_type] = (c[d.doc_type] ?? 0) + 1));
-        setCounts(c);
-      });
-    supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => setProfileName(data?.name ?? user.email ?? ""));
-  }, [user, pathname]);
-
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="font-serif text-xl text-[color:var(--muted-navy)]">Loading…</div>
+      <div className="flex min-h-screen bg-white">
+        <div className="hidden w-[260px] shrink-0 border-r p-6 md:block" style={{ borderColor: "var(--border)" }}>
+          <div className="skeleton h-7 w-32" />
+          <div className="mt-10 space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton h-9 w-full" />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 px-10 py-10">
+          <div className="skeleton h-10 w-56" />
+          <div className="skeleton mt-3 h-4 w-72" />
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="skeleton h-32 w-full" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -71,7 +77,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
     <div className="flex min-h-screen bg-white">
       {/* Mobile top bar */}
       <header
-        className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-white px-4 md:hidden"
+        className="vt-topbar fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-white px-4 md:hidden"
         style={{ borderColor: "var(--border)" }}
       >
         <button
@@ -94,17 +100,18 @@ export function AppShell({ children }: { children?: ReactNode }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col border-r bg-white transition-transform duration-200 md:static md:flex md:translate-x-0 ${
+        className={`vt-sidebar fixed inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col border-r bg-white transition-all duration-200 md:static md:flex md:w-16 md:translate-x-0 lg:w-[260px] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
         style={{ borderColor: "var(--border)" }}
       >
-        <div className="flex items-start justify-between px-6 py-7">
+        <div className="flex items-start justify-between px-6 py-7 md:justify-center md:px-3 lg:justify-between lg:px-6">
           <div>
-            <div className="font-serif text-2xl leading-none text-[color:var(--ink)]">
-              Alpine-Eco
+            <div className="font-serif text-2xl leading-none text-[color:var(--ink)] md:text-center md:text-xl lg:text-left lg:text-2xl">
+              <span className="md:hidden lg:inline">Alpine-Eco</span>
+              <span className="hidden md:inline lg:hidden">AE</span>
             </div>
-            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-navy)]">
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-navy)] md:hidden lg:block">
               Workflow
             </div>
           </div>
@@ -118,7 +125,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
         </div>
 
         <div className="px-3">
-          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-navy)]">
+          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-navy)] md:hidden lg:block">
             Main
           </div>
           <nav className="flex flex-col gap-0.5">
@@ -134,7 +141,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             ))}
           </nav>
 
-          <div className="mt-6 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-navy)]">
+          <div className="mt-6 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-navy)] md:hidden lg:block">
             History
           </div>
           <nav className="flex flex-col gap-0.5">
@@ -147,23 +154,23 @@ export function AppShell({ children }: { children?: ReactNode }) {
           </nav>
         </div>
 
-        <div className="mt-auto border-t p-4" style={{ borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--offwhite)] font-serif text-sm text-[color:var(--royal)]">
+        <div className="mt-auto border-t p-4 md:px-2 lg:px-4" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center gap-3 md:justify-center lg:justify-start">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--offwhite)] font-serif text-sm text-[color:var(--royal)]">
               {(profileName || "?").charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 md:hidden lg:block">
               <div className="truncate text-sm font-medium text-[color:var(--ink)]">
                 {profileName || user.email}
               </div>
               <div className="truncate text-[11px] text-[color:var(--muted-navy)]">
-                Factory Staff
+                {roleLabel}
               </div>
             </div>
             <button
               onClick={() => signOut()}
               title="Sign out"
-              className="rounded-md p-1.5 text-[color:var(--muted-navy)] transition-colors hover:bg-[color:var(--offwhite)] hover:text-[color:var(--royal)]"
+              className="rounded-md p-1.5 text-[color:var(--muted-navy)] transition-colors hover:bg-[color:var(--offwhite)] hover:text-[color:var(--royal)] md:hidden lg:block"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -196,23 +203,27 @@ function SidebarLink({
   return (
     <Link
       to={to}
-      className="group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-150"
+      title={label}
+      className="group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-150 md:justify-center lg:justify-start"
       style={{
         backgroundColor: active ? "var(--offwhite)" : "transparent",
         color: active ? "var(--royal)" : "var(--mid-navy)",
       }}
     >
-      {active && (
-        <span
-          className="absolute left-0 top-1 bottom-1 w-[2px] rounded-r"
-          style={{ backgroundColor: "var(--royal)" }}
-        />
-      )}
-      <Icon className="h-4 w-4" />
-      <span className="flex-1 font-medium">{label}</span>
+      <span
+        className="absolute left-0 top-1 bottom-1 w-[2px] rounded-r transition-all duration-150 ease-out"
+        style={{
+          backgroundColor: "var(--royal)",
+          opacity: active ? 1 : 0,
+          transform: active ? "translateX(0)" : "translateX(-3px)",
+        }}
+      />
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="flex-1 font-medium md:hidden lg:inline">{label}</span>
       {count !== undefined && count > 0 && (
         <span
-          className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+          key={count}
+          className="badge-pop rounded-full px-2 py-0.5 text-[10px] font-semibold text-white md:hidden lg:inline"
           style={{ backgroundColor: "var(--eco)" }}
         >
           {count}

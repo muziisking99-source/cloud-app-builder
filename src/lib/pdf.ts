@@ -34,70 +34,122 @@ type Task = {
   due_date?: string | null;
 };
 
+const COMPANY = {
+  name: "Alpine-Eco",
+  tagline: "Notebooks and diaries",
+  address: "22 Stevens Rd Stafford, Johannesburg",
+  phone: "011 493 0113",
+  email: "info@alpine-eco.co.za",
+};
+
 const ROYAL: [number, number, number] = [27, 63, 190];
+const ROYAL_LIGHT: [number, number, number] = [235, 240, 252];
 const INK: [number, number, number] = [13, 26, 46];
 const MUTED: [number, number, number] = [107, 126, 149];
 const MID: [number, number, number] = [42, 61, 85];
 const ECO: [number, number, number] = [30, 158, 94];
-const AMBER: [number, number, number] = [217, 119, 6];
 const DANGER: [number, number, number] = [200, 40, 60];
 const OFFWHITE: [number, number, number] = [244, 247, 242];
+const WHITE: [number, number, number] = [255, 255, 255];
+const BORDER: [number, number, number] = [230, 232, 240];
 
-function drawHeader(pdf: jsPDF, doc: Doc, W: number) {
+const TABLE_HEAD = {
+  fillColor: ROYAL_LIGHT,
+  textColor: ROYAL,
+  fontSize: 9,
+  fontStyle: "bold" as const,
+  cellPadding: 8,
+};
+const TABLE_BODY = {
+  fontSize: 10,
+  textColor: INK,
+  cellPadding: 8,
+  lineColor: BORDER,
+  lineWidth: 0.5,
+};
+const TABLE_ALT = { fillColor: OFFWHITE };
+
+/** Draw branded header; returns Y below the divider for the body section. */
+function drawHeader(pdf: jsPDF, doc: Doc, W: number): number {
   pdf.setFillColor(...ROYAL);
   pdf.rect(0, 0, W, 6, "F");
+
+  // Accent mark beside company name
+  pdf.setFillColor(...ECO);
+  pdf.roundedRect(40, 44, 8, 8, 2, 2, "F");
 
   pdf.setFont("times", "normal");
   pdf.setFontSize(24);
   pdf.setTextColor(...INK);
-  pdf.text("Alpine-Eco", 40, 62);
+  pdf.text(COMPANY.name, 56, 54);
+
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
-  pdf.setTextColor(...MUTED);
-  pdf.text("Manufacturing & Fabrication", 40, 78);
+  pdf.setTextColor(...MID);
+  pdf.text(COMPANY.tagline, 56, 70);
 
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  let contactY = 86;
+  pdf.text(COMPANY.address, 40, contactY);
+  contactY += 12;
+  pdf.text(`${COMPANY.phone}  ·  ${COMPANY.email}`, 40, contactY);
+
+  // Right column — document type & meta
   pdf.setFont("times", "bold");
-  pdf.setFontSize(24);
+  pdf.setFontSize(22);
   pdf.setTextColor(...ROYAL);
-  pdf.text((DOC_LABEL[doc.doc_type] || "Document").toUpperCase(), W - 40, 62, { align: "right" });
+  pdf.text((DOC_LABEL[doc.doc_type] || "Document").toUpperCase(), W - 40, 54, { align: "right" });
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   pdf.setTextColor(...MID);
-  pdf.text(doc.doc_number, W - 40, 80, { align: "right" });
-  pdf.text(fmtDate(doc.doc_date), W - 40, 96, { align: "right" });
+  pdf.text(doc.doc_number, W - 40, 74, { align: "right" });
+  pdf.text(fmtDate(doc.doc_date), W - 40, 90, { align: "right" });
 
+  const dividerY = 118;
   pdf.setDrawColor(...ROYAL);
   pdf.setLineWidth(1);
-  pdf.line(40, 112, W - 40, 112);
+  pdf.line(40, dividerY, W - 40, dividerY);
+
+  return dividerY + 22;
 }
 
-function drawCustomer(pdf: jsPDF, doc: Doc, W: number, heading = "BILL TO"): number {
+function drawCustomer(pdf: jsPDF, doc: Doc, W: number, topY: number, heading = "BILL TO"): number {
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(...MUTED);
-  pdf.text(heading, 40, 134);
+  pdf.text(heading, 40, topY);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(11);
   pdf.setTextColor(...INK);
-  let y = 150;
-  pdf.text(doc.customer_name || "—", 40, y); y += 14;
-  if (doc.customer_email) { pdf.text(doc.customer_email, 40, y); y += 14; }
-  if (doc.customer_phone) { pdf.text(doc.customer_phone, 40, y); y += 14; }
+  let y = topY + 16;
+  pdf.text(doc.customer_name || "—", 40, y);
+  y += 14;
+  if (doc.customer_email) {
+    pdf.text(doc.customer_email, 40, y);
+    y += 14;
+  }
+  if (doc.customer_phone) {
+    pdf.text(doc.customer_phone, 40, y);
+    y += 14;
+  }
   if (doc.customer_address) {
     const wrapped = pdf.splitTextToSize(doc.customer_address, W / 2 - 60);
-    pdf.text(wrapped, 40, y); y += wrapped.length * 14;
+    pdf.text(wrapped, 40, y);
+    y += wrapped.length * 14;
   }
   return y;
 }
 
-function drawMeta(pdf: jsPDF, doc: Doc, W: number) {
+function drawMeta(pdf: jsPDF, doc: Doc, W: number, topY: number): number {
   const x = W / 2 + 10;
+  let y = topY;
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(...MUTED);
-  let y = 134;
   if (doc.project_description) {
-    pdf.text("PROJECT", x, y); y += 16;
+    pdf.text("PROJECT", x, y);
+    y += 16;
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
     pdf.setTextColor(...INK);
@@ -109,18 +161,20 @@ function drawMeta(pdf: jsPDF, doc: Doc, W: number) {
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9);
     pdf.setTextColor(...MUTED);
-    pdf.text("DUE DATE", x, y); y += 16;
+    pdf.text("DUE DATE", x, y);
+    y += 16;
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
     pdf.setTextColor(...INK);
     pdf.text(fmtDate(doc.due_date), x, y);
+    y += 14;
   }
+  return y;
 }
 
-function drawStatusStamp(pdf: jsPDF, W: number, label: string, color: [number, number, number]) {
+function drawStatusStamp(pdf: jsPDF, W: number, y: number, label: string, color: [number, number, number]) {
   pdf.saveGraphicsState();
   const x = W - 140;
-  const y = 200;
   pdf.setDrawColor(...color);
   pdf.setTextColor(...color);
   pdf.setLineWidth(2);
@@ -143,14 +197,9 @@ function drawItemsTable(pdf: jsPDF, items: Item[], startY: number, withPricing: 
         money(it.total_price),
       ]),
       theme: "plain",
-      headStyles: {
-        fillColor: OFFWHITE, textColor: MID, fontSize: 9,
-        fontStyle: "bold", cellPadding: 8,
-      },
-      bodyStyles: {
-        fontSize: 10, textColor: INK, cellPadding: 8,
-        lineColor: [230, 232, 240], lineWidth: 0.5,
-      },
+      headStyles: TABLE_HEAD,
+      bodyStyles: TABLE_BODY,
+      alternateRowStyles: TABLE_ALT,
       columnStyles: {
         1: { halign: "center", cellWidth: 60 },
         2: { halign: "right", cellWidth: 95 },
@@ -164,14 +213,9 @@ function drawItemsTable(pdf: jsPDF, items: Item[], startY: number, withPricing: 
       head: [["Description", "Qty Delivered"]],
       body: items.map((it) => [it.description, String(it.quantity)]),
       theme: "plain",
-      headStyles: {
-        fillColor: OFFWHITE, textColor: MID, fontSize: 9,
-        fontStyle: "bold", cellPadding: 8,
-      },
-      bodyStyles: {
-        fontSize: 10, textColor: INK, cellPadding: 8,
-        lineColor: [230, 232, 240], lineWidth: 0.5,
-      },
+      headStyles: TABLE_HEAD,
+      bodyStyles: TABLE_BODY,
+      alternateRowStyles: TABLE_ALT,
       columnStyles: {
         1: { halign: "center", cellWidth: 120 },
       },
@@ -192,55 +236,107 @@ function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number) {
   pdf.text(`Tax (${doc.tax_rate}%)`, labelX, startY + 16);
   pdf.text(money(doc.tax_amount), rightX, startY + 16, { align: "right" });
 
-  pdf.setDrawColor(...ROYAL);
-  pdf.setLineWidth(0.8);
-  pdf.line(labelX, startY + 26, rightX, startY + 26);
+  // Royal band for total
+  const bandY = startY + 30;
+  const bandH = 32;
+  pdf.setFillColor(...ROYAL);
+  pdf.roundedRect(labelX - 8, bandY, rightX - labelX + 8, bandH, 3, 3, "F");
   pdf.setFont("times", "bold");
-  pdf.setFontSize(16);
-  pdf.setTextColor(...ROYAL);
-  pdf.text("Total", labelX, startY + 46);
-  pdf.text(money(doc.total), rightX, startY + 46, { align: "right" });
+  pdf.setFontSize(14);
+  pdf.setTextColor(...WHITE);
+  pdf.text("Total", labelX, bandY + 21);
+  pdf.text(money(doc.total), rightX, bandY + 21, { align: "right" });
 }
 
 function drawFooter(pdf: jsPDF, W: number, terms: string) {
   const H = pdf.internal.pageSize.getHeight();
-  pdf.setDrawColor(230, 232, 240);
+  pdf.setDrawColor(...BORDER);
   pdf.setLineWidth(0.5);
-  pdf.line(40, H - 60, W - 40, H - 60);
+  pdf.line(40, H - 68, W - 40, H - 68);
+
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(...MUTED);
-  const wrapped = pdf.splitTextToSize(terms, W - 200);
-  pdf.text(wrapped, 40, H - 46);
+  const wrapped = pdf.splitTextToSize(terms, W - 80);
+  pdf.text(wrapped, 40, H - 54);
+
+  const contactLine = `${COMPANY.name}  ·  ${COMPANY.address}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`;
+  pdf.setFontSize(7);
+  pdf.text(contactLine, 40, H - 28);
 
   pdf.setTextColor(...ECO);
-  pdf.text("●", W - 180, H - 30);
+  pdf.text("●", W - 80, H - 28);
   pdf.setTextColor(...MUTED);
-  pdf.text("Alpine-Eco Workflow", W - 170, H - 30);
-  pdf.text(`Page 1`, W - 40, H - 30, { align: "right" });
+  pdf.text("Page 1", W - 40, H - 28, { align: "right" });
+}
+
+/** Two-column signature block for delivery notes. */
+function drawDeliverySignatures(pdf: jsPDF, W: number, startY: number) {
+  const colW = (W - 100) / 2;
+  const leftX = 40;
+  const rightX = leftX + colW + 20;
+  const lineY = startY + 36;
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.setTextColor(...MID);
+  pdf.text("DELIVERED BY", leftX, startY);
+  pdf.text("RECEIVED BY", rightX, startY);
+
+  pdf.setDrawColor(...MID);
+  pdf.setLineWidth(0.5);
+  pdf.line(leftX, lineY, leftX + colW, lineY);
+  pdf.line(rightX, lineY, rightX + colW, lineY);
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  pdf.text("Signature", leftX, lineY + 12);
+  pdf.text("Signature", rightX, lineY + 12);
+
+  const nameY = lineY + 30;
+  pdf.line(leftX, nameY, leftX + colW, nameY);
+  pdf.line(rightX, nameY, rightX + colW, nameY);
+  pdf.text("Printed name", leftX, nameY + 12);
+  pdf.text("Printed name", rightX, nameY + 12);
+
+  const dateY = nameY + 30;
+  pdf.line(leftX, dateY, leftX + colW * 0.55, dateY);
+  pdf.line(rightX, dateY, rightX + colW * 0.55, dateY);
+  pdf.text("Date", leftX, dateY + 12);
+  pdf.text("Date", rightX, dateY + 12);
+
+  pdf.setFont("helvetica", "italic");
+  pdf.setFontSize(7);
+  pdf.text("Goods received in good condition", rightX, dateY + 26);
 }
 
 export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; parentRef?: string | null }) {
   const pdf = new jsPDF({ unit: "pt", format: "letter" });
   const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
 
-  drawHeader(pdf, doc, W);
+  const bodyTop = drawHeader(pdf, doc, W);
   const custHeading =
     doc.doc_type === "delivery_note" ? "DELIVER TO" :
     doc.doc_type === "job_card" ? "CUSTOMER" : "BILL TO";
-  const custY = drawCustomer(pdf, doc, W, custHeading);
-  drawMeta(pdf, doc, W);
+  const custY = drawCustomer(pdf, doc, W, bodyTop, custHeading);
+  const metaY = drawMeta(pdf, doc, W, bodyTop);
 
-  // Status stamp for paid/overdue invoices
-  if (doc.doc_type === "invoice") {
-    if (doc.status === "paid") drawStatusStamp(pdf, W, "PAID", ECO);
-    else if (doc.status === "overdue") drawStatusStamp(pdf, W, "OVERDUE", DANGER);
+  // Status stamp for paid/overdue invoices — sits below the customer/meta block
+  // and reserves its own height so the items table starts beneath it.
+  let contentBottom = Math.max(custY, metaY);
+  if (doc.doc_type === "invoice" && (doc.status === "paid" || doc.status === "overdue")) {
+    const stampY = contentBottom + 12;
+    const stampH = 34;
+    if (doc.status === "paid") drawStatusStamp(pdf, W, stampY, "PAID", ECO);
+    else drawStatusStamp(pdf, W, stampY, "OVERDUE", DANGER);
+    contentBottom = stampY + stampH;
   }
 
-  const tableStart = Math.max(custY + 20, 230);
+  const tableStart = contentBottom + 24;
 
   if (doc.doc_type === "job_card") {
-    // Job card: task checklist, no financials
     const tasks = extras?.tasks ?? [];
     autoTable(pdf, {
       startY: tableStart,
@@ -253,8 +349,9 @@ export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; 
         t.status.replace(/_/g, " "),
       ]) : [["", "No tasks yet", "", "", ""]],
       theme: "plain",
-      headStyles: { fillColor: OFFWHITE, textColor: MID, fontSize: 9, fontStyle: "bold", cellPadding: 8 },
-      bodyStyles: { fontSize: 10, textColor: INK, cellPadding: 8, lineColor: [230, 232, 240], lineWidth: 0.5 },
+      headStyles: TABLE_HEAD,
+      bodyStyles: TABLE_BODY,
+      alternateRowStyles: TABLE_ALT,
       columnStyles: {
         0: { cellWidth: 24, halign: "center" },
         3: { cellWidth: 80 },
@@ -301,23 +398,14 @@ export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; 
       pdf.text(wrapped, 40, y + 16);
       y += 20 + wrapped.length * 12;
     }
-    // Signature block
-    y = Math.max(y + 40, pdf.internal.pageSize.getHeight() - 160);
-    pdf.setDrawColor(...MID);
-    pdf.setLineWidth(0.5);
-    pdf.line(40, y, 280, y);
-    pdf.line(W - 280, y, W - 40, y);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(...MUTED);
-    pdf.text("Received by (print name & signature)", 40, y + 14);
-    pdf.text("Date", W - 280, y + 14);
+    const sigY = Math.max(y + 40, H - 220);
+    drawDeliverySignatures(pdf, W, sigY);
     drawFooter(pdf, W, "Please inspect goods on delivery. Report discrepancies within 48 hours.");
   } else {
     // quote & invoice
     const endY = drawItemsTable(pdf, items, tableStart, true);
     drawTotals(pdf, doc, W, endY + 24);
-    let y = endY + 100;
+    let y = endY + 110;
 
     if (doc.notes) {
       pdf.setFont("helvetica", "bold");
@@ -333,22 +421,12 @@ export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; 
     }
 
     if (doc.doc_type === "invoice") {
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont("helvetica", "italic");
       pdf.setFontSize(9);
       pdf.setTextColor(...MUTED);
-      pdf.text("PAYMENT DETAILS", 40, y + 10);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...MID);
-      pdf.text([
-        "Bank: Standard Bank · Branch: 051001",
-        "Account name: Alpine-Eco (Pty) Ltd · Account no: 000 000 000",
-        `Reference: ${doc.doc_number}`,
-        doc.due_date ? `Payment due by ${fmtDate(doc.due_date)}.` : "Payment due on receipt.",
-      ], 40, y + 26);
-      drawFooter(pdf, W, "Thank you for your business. Payment terms: Net 30 unless otherwise agreed.");
+      pdf.text("Thank you for your business.", 40, y + 10);
+      drawFooter(pdf, W, "Please retain this invoice for your records.");
     } else {
-      // quote
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(9);
       pdf.setTextColor(...MUTED);

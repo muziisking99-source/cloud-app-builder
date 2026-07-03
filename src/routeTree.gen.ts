@@ -17,8 +17,12 @@ import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as QuotesIndexRouteImport } from './routes/quotes.index'
+import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
+import { Route as DeliveryIndexRouteImport } from './routes/delivery.index'
 import { Route as QuotesNewRouteImport } from './routes/quotes.new'
 import { Route as QuotesIdRouteImport } from './routes/quotes.$id'
+import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
+import { Route as DeliveryIdRouteImport } from './routes/delivery.$id'
 
 const TrackerRoute = TrackerRouteImport.update({
   id: '/tracker',
@@ -60,6 +64,16 @@ const QuotesIndexRoute = QuotesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => QuotesRoute,
 } as any)
+const InvoicesIndexRoute = InvoicesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InvoicesRoute,
+} as any)
+const DeliveryIndexRoute = DeliveryIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DeliveryRoute,
+} as any)
 const QuotesNewRoute = QuotesNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -70,41 +84,61 @@ const QuotesIdRoute = QuotesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => QuotesRoute,
 } as any)
+const InvoicesIdRoute = InvoicesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InvoicesRoute,
+} as any)
+const DeliveryIdRoute = DeliveryIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DeliveryRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/delivery': typeof DeliveryRoute
-  '/invoices': typeof InvoicesRoute
+  '/delivery': typeof DeliveryRouteWithChildren
+  '/invoices': typeof InvoicesRouteWithChildren
   '/jobs': typeof JobsRoute
   '/quotes': typeof QuotesRouteWithChildren
   '/tracker': typeof TrackerRoute
+  '/delivery/$id': typeof DeliveryIdRoute
+  '/invoices/$id': typeof InvoicesIdRoute
   '/quotes/$id': typeof QuotesIdRoute
   '/quotes/new': typeof QuotesNewRoute
+  '/delivery/': typeof DeliveryIndexRoute
+  '/invoices/': typeof InvoicesIndexRoute
   '/quotes/': typeof QuotesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/delivery': typeof DeliveryRoute
-  '/invoices': typeof InvoicesRoute
   '/jobs': typeof JobsRoute
   '/tracker': typeof TrackerRoute
+  '/delivery/$id': typeof DeliveryIdRoute
+  '/invoices/$id': typeof InvoicesIdRoute
   '/quotes/$id': typeof QuotesIdRoute
   '/quotes/new': typeof QuotesNewRoute
+  '/delivery': typeof DeliveryIndexRoute
+  '/invoices': typeof InvoicesIndexRoute
   '/quotes': typeof QuotesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/delivery': typeof DeliveryRoute
-  '/invoices': typeof InvoicesRoute
+  '/delivery': typeof DeliveryRouteWithChildren
+  '/invoices': typeof InvoicesRouteWithChildren
   '/jobs': typeof JobsRoute
   '/quotes': typeof QuotesRouteWithChildren
   '/tracker': typeof TrackerRoute
+  '/delivery/$id': typeof DeliveryIdRoute
+  '/invoices/$id': typeof InvoicesIdRoute
   '/quotes/$id': typeof QuotesIdRoute
   '/quotes/new': typeof QuotesNewRoute
+  '/delivery/': typeof DeliveryIndexRoute
+  '/invoices/': typeof InvoicesIndexRoute
   '/quotes/': typeof QuotesIndexRoute
 }
 export interface FileRouteTypes {
@@ -117,19 +151,25 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/quotes'
     | '/tracker'
+    | '/delivery/$id'
+    | '/invoices/$id'
     | '/quotes/$id'
     | '/quotes/new'
+    | '/delivery/'
+    | '/invoices/'
     | '/quotes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/delivery'
-    | '/invoices'
     | '/jobs'
     | '/tracker'
+    | '/delivery/$id'
+    | '/invoices/$id'
     | '/quotes/$id'
     | '/quotes/new'
+    | '/delivery'
+    | '/invoices'
     | '/quotes'
   id:
     | '__root__'
@@ -140,16 +180,20 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/quotes'
     | '/tracker'
+    | '/delivery/$id'
+    | '/invoices/$id'
     | '/quotes/$id'
     | '/quotes/new'
+    | '/delivery/'
+    | '/invoices/'
     | '/quotes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
-  DeliveryRoute: typeof DeliveryRoute
-  InvoicesRoute: typeof InvoicesRoute
+  DeliveryRoute: typeof DeliveryRouteWithChildren
+  InvoicesRoute: typeof InvoicesRouteWithChildren
   JobsRoute: typeof JobsRoute
   QuotesRoute: typeof QuotesRouteWithChildren
   TrackerRoute: typeof TrackerRoute
@@ -213,6 +257,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuotesIndexRouteImport
       parentRoute: typeof QuotesRoute
     }
+    '/invoices/': {
+      id: '/invoices/'
+      path: '/'
+      fullPath: '/invoices/'
+      preLoaderRoute: typeof InvoicesIndexRouteImport
+      parentRoute: typeof InvoicesRoute
+    }
+    '/delivery/': {
+      id: '/delivery/'
+      path: '/'
+      fullPath: '/delivery/'
+      preLoaderRoute: typeof DeliveryIndexRouteImport
+      parentRoute: typeof DeliveryRoute
+    }
     '/quotes/new': {
       id: '/quotes/new'
       path: '/new'
@@ -227,8 +285,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuotesIdRouteImport
       parentRoute: typeof QuotesRoute
     }
+    '/invoices/$id': {
+      id: '/invoices/$id'
+      path: '/$id'
+      fullPath: '/invoices/$id'
+      preLoaderRoute: typeof InvoicesIdRouteImport
+      parentRoute: typeof InvoicesRoute
+    }
+    '/delivery/$id': {
+      id: '/delivery/$id'
+      path: '/$id'
+      fullPath: '/delivery/$id'
+      preLoaderRoute: typeof DeliveryIdRouteImport
+      parentRoute: typeof DeliveryRoute
+    }
   }
 }
+
+interface DeliveryRouteChildren {
+  DeliveryIdRoute: typeof DeliveryIdRoute
+  DeliveryIndexRoute: typeof DeliveryIndexRoute
+}
+
+const DeliveryRouteChildren: DeliveryRouteChildren = {
+  DeliveryIdRoute: DeliveryIdRoute,
+  DeliveryIndexRoute: DeliveryIndexRoute,
+}
+
+const DeliveryRouteWithChildren = DeliveryRoute._addFileChildren(
+  DeliveryRouteChildren,
+)
+
+interface InvoicesRouteChildren {
+  InvoicesIdRoute: typeof InvoicesIdRoute
+  InvoicesIndexRoute: typeof InvoicesIndexRoute
+}
+
+const InvoicesRouteChildren: InvoicesRouteChildren = {
+  InvoicesIdRoute: InvoicesIdRoute,
+  InvoicesIndexRoute: InvoicesIndexRoute,
+}
+
+const InvoicesRouteWithChildren = InvoicesRoute._addFileChildren(
+  InvoicesRouteChildren,
+)
 
 interface QuotesRouteChildren {
   QuotesIdRoute: typeof QuotesIdRoute
@@ -248,8 +348,8 @@ const QuotesRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
-  DeliveryRoute: DeliveryRoute,
-  InvoicesRoute: InvoicesRoute,
+  DeliveryRoute: DeliveryRouteWithChildren,
+  InvoicesRoute: InvoicesRouteWithChildren,
   JobsRoute: JobsRoute,
   QuotesRoute: QuotesRouteWithChildren,
   TrackerRoute: TrackerRoute,
@@ -257,3 +357,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

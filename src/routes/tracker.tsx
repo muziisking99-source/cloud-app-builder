@@ -1,48 +1,53 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { AuthProvider } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDocumentsByType, useActivity } from "@/lib/queries";
 import { StatusBadge } from "@/components/StatusBadge";
+import { EmptyState } from "@/components/EmptyState";
+import { useDebounced } from "@/hooks/useDebounced";
 import { fmtDate, DOC_LABEL } from "@/lib/format";
 
 export const Route = createFileRoute("/tracker")({
-  component: () => (
-    <AuthProvider>
-      <AppShell>
-        <Tracker />
-      </AppShell>
-    </AuthProvider>
-  ),
+  component: Tracker,
 });
 
 function Tracker() {
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [related, setRelated] = useState<any[]>([]);
-  const [activity, setActivity] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [q, setQ] = useState("");
+  const debouncedQ = useDebounced(q, 200);
+
+  const { data: quotes = [], isPending } = useDocumentsByType("quote");
+  const { data: activity = [] } = useActivity(selected?.id ?? "", !!selected);
+  const { data: related = [] } = useQuery({
+    queryKey: ["related", selected?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .or(`id.eq.${selected.id},parent_id.eq.${selected.id}`);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!selected,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
-    supabase.from("documents").select("*").eq("doc_type", "quote").order("created_at", { ascending: false }).then(({ data }) => {
-      setQuotes(data ?? []);
-      if (data && data.length && !selected) setSelected(data[0]);
-    });
-  }, []);
+    if (quotes.length && !selected) setSelected(quotes[0]);
+  }, [quotes, selected]);
 
-  useEffect(() => {
-    if (!selected) return;
-    supabase.from("documents").select("*").or(`id.eq.${selected.id},parent_id.eq.${selected.id}`).then(({ data }) => setRelated(data ?? []));
-    supabase.from("activity_log").select("*").eq("document_id", selected.id).order("performed_at").then(({ data }) => setActivity(data ?? []));
-  }, [selected]);
-
-  const filtered = quotes.filter((qt) =>
-    !q.trim() || qt.customer_name.toLowerCase().includes(q.toLowerCase()) || qt.doc_number.toLowerCase().includes(q.toLowerCase()),
+  const filtered = quotes.filter(
+    (qt: any) =>
+      !debouncedQ.trim() ||
+      qt.customer_name.toLowerCase().includes(debouncedQ.toLowerCase()) ||
+      qt.doc_number.toLowerCase().includes(debouncedQ.toLowerCase()),
   );
 
   return (
     <div>
-      <h1 className="font-serif text-4xl leading-none">Order Tracker</h1>
+      <h1 className="page-title font-serif text-4xl leading-none">Order Tracker</h1>
       <p className="mt-2 text-sm text-[color:var(--muted-navy)]">Follow every order from first quote to final delivery.</p>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[420px_1fr]">
@@ -57,26 +62,38 @@ function Tracker() {
             />
           </div>
           <div className="max-h-[600px] overflow-y-auto">
-            {filtered.map((qt) => (
-              <button
-                key={qt.id}
-                onClick={() => setSelected(qt)}
-                className="relative flex w-full items-start justify-between gap-3 border-b p-4 text-left transition-colors hover:bg-[color:var(--offwhite)]"
-                style={{
-                  borderColor: "var(--border)",
-                  backgroundColor: selected?.id === qt.id ? "var(--offwhite)" : "transparent",
-                }}
-              >
-                {selected?.id === qt.id && <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-[color:var(--royal)]" />}
-                <div>
-                  <div className="font-mono text-[11px] text-[color:var(--royal)]">{qt.doc_number}</div>
-                  <div className="mt-1 text-sm text-[color:var(--ink)]">{qt.customer_name}</div>
-                  <div className="text-[11px] text-[color:var(--muted-navy)]">{fmtDate(qt.doc_date)}</div>
-                </div>
-                <StatusBadge status={qt.status} />
-              </button>
-            ))}
-            {filtered.length === 0 && <div className="p-6 text-center text-sm text-[color:var(--muted-navy)]">No results.</div>}
+            {isPending ? (
+              <div className="space-y-3 p-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="skeleton h-16 w-full" />
+                ))}
+              </div>
+            ) : (
+              <>
+                {filtered.map((qt: any) => (
+                  <button
+                    key={qt.id}
+                    onClick={() => setSelected(qt)}
+                    className="relative flex w-full items-start justify-between gap-3 border-b p-4 text-left transition-colors hover:bg-[color:var(--offwhite)]"
+                    style={{
+                      borderColor: "var(--border)",
+                      backgroundColor: selected?.id === qt.id ? "var(--offwhite)" : "transparent",
+                    }}
+                  >
+                    {selected?.id === qt.id && <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-[color:var(--royal)]" />}
+                    <div>
+                      <div className="font-mono text-[11px] text-[color:var(--royal)]">{qt.doc_number}</div>
+                      <div className="mt-1 text-sm text-[color:var(--ink)]">{qt.customer_name}</div>
+                      <div className="text-[11px] text-[color:var(--muted-navy)]">{fmtDate(qt.doc_date)}</div>
+                    </div>
+                    <StatusBadge status={qt.status} />
+                  </button>
+                ))}
+                {filtered.length === 0 && (
+                  <EmptyState Icon={Search} title="No orders found" message={debouncedQ.trim() ? `Nothing matches “${debouncedQ}”.` : "Orders will appear here once quotes exist."} />
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -97,7 +114,7 @@ function Tracker() {
               <div className="mt-6">
                 <div className="label-caps mb-4">Documents in this order</div>
                 <div className="flex flex-wrap gap-2">
-                  {related.map((r) => (
+                  {related.map((r: any) => (
                     <span key={r.id} className="rounded border px-3 py-1.5 text-[11px]" style={{ borderColor: "var(--border)" }}>
                       <span className="font-mono text-[color:var(--royal)]">{r.doc_number}</span>
                       <span className="ml-2 text-[color:var(--muted-navy)]">· {DOC_LABEL[r.doc_type]}</span>
@@ -108,10 +125,10 @@ function Tracker() {
 
               <div className="mt-8">
                 <div className="label-caps mb-4">Timeline</div>
-                <div className="relative pl-6">
-                  <div className="absolute left-[7px] top-1 bottom-1 w-[2px] bg-gradient-to-b from-[color:var(--royal)] to-[color:var(--eco)]" />
+                <div className="relative pl-6" key={selected.id}>
+                  <div className="timeline-line timeline-scroll absolute left-[7px] top-1 bottom-1 w-[2px] bg-gradient-to-b from-[color:var(--royal)] to-[color:var(--eco)]" />
                   {activity.length === 0 && <div className="text-sm text-[color:var(--muted-navy)]">No activity yet.</div>}
-                  {activity.map((a, i) => (
+                  {activity.map((a: any, i: number) => (
                     <div
                       key={a.id}
                       className="animate-rise relative mb-5 last:mb-0"
