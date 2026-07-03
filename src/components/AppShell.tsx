@@ -10,6 +10,8 @@ import {
   ClipboardList,
   History,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 
 type NavItem = { to: string; label: string; icon: typeof FileText; badgeKey?: string };
