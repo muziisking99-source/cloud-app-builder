@@ -30,6 +30,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [profileName, setProfileName] = useState<string>("");
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
