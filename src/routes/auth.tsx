@@ -32,12 +32,12 @@ function AuthPage() {
 
   return (
     <div className="relative grid min-h-screen grid-cols-1 md:grid-cols-2">
-      <div
-        className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 select-none font-serif text-2xl italic tracking-wide text-[color:var(--muted-navy)]/70"
-      >
-        Built by Muzi
-      </div>
-      <div className="flex items-center justify-center bg-white px-6 py-14">
+      <div className="relative flex items-center justify-center bg-white px-6 py-14">
+        <div
+          className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 select-none whitespace-nowrap font-serif text-2xl italic tracking-wide text-[color:var(--royal)]"
+        >
+          Built by Muzi
+        </div>
         <div
           className="animate-rise w-full max-w-md rounded-md border p-10"
           style={{ borderColor: "rgba(27,63,190,0.14)" }}
@@ -113,25 +113,88 @@ function AuthPage() {
         </div>
       </div>
 
+      {/* Mobile hero strip — visible when the right panel is hidden */}
+      <div className="relative overflow-hidden border-t bg-[color:var(--offwhite)] px-6 py-10 md:hidden" style={{ borderColor: "var(--border)" }}>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+          <span className="select-none whitespace-nowrap font-serif text-[3.5rem] italic leading-none text-[color:var(--royal)]/8">
+            The Accounting Tool
+          </span>
+        </div>
+        <div className="relative text-center">
+          <p className="font-serif text-2xl leading-snug text-[color:var(--ink)]">
+            Quotes to invoices, invoices to delivery — <em className="text-[color:var(--royal)]">tracked in one place.</em>
+          </p>
+          <p className="mt-3 text-sm text-[color:var(--muted-navy)]">
+            Alpine-Eco Workflow · Est. 2026
+          </p>
+          <p className="mt-6 font-serif text-xl italic text-[color:var(--royal)]">Built by Muzi</p>
+        </div>
+      </div>
+
       <div
-        className="relative hidden overflow-hidden md:block"
+        className="relative hidden min-h-screen overflow-hidden md:block"
         style={{
-          backgroundColor: "#f4f7f2",
-          clipPath: "polygon(6% 0, 100% 0, 100% 100%, 0 100%)",
+          background: "linear-gradient(145deg, #f4f7f2 0%, #e8edf8 55%, #f4f7f2 100%)",
+          clipPath: "polygon(5% 0, 100% 0, 100% 100%, 0 100%)",
         }}
       >
-        <div className="absolute inset-0 dot-grid opacity-70" />
-        <div className="relative flex h-full items-center justify-center px-16">
-          <div className="max-w-md">
-            <div className="font-serif text-6xl leading-tight text-[color:var(--ink)]">
-              A quiet <em className="font-serif italic text-[color:var(--royal)]">tool</em> for a busy floor.
+        <div className="absolute inset-0 dot-grid opacity-50" />
+
+        {/* Large background watermark */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+          <span
+            className="select-none whitespace-nowrap font-serif text-[5.5rem] italic leading-none text-[color:var(--royal)]/[0.07] lg:text-[7rem]"
+            style={{ transform: "rotate(-12deg)" }}
+          >
+            The Accounting Tool
+          </span>
+        </div>
+
+        {/* Accent shapes */}
+        <div className="absolute -right-20 top-24 h-64 w-64 rounded-full bg-[color:var(--royal)]/5 blur-3xl" />
+        <div className="absolute bottom-32 left-8 h-48 w-48 rounded-full bg-[color:var(--eco)]/8 blur-3xl" />
+
+        <div className="relative flex h-full min-h-screen flex-col justify-between px-12 py-16 lg:px-20">
+          <div className="max-w-lg">
+            <div className="inline-flex items-center gap-2 rounded-full border bg-white/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--royal)] backdrop-blur-sm" style={{ borderColor: "rgba(27,63,190,0.2)" }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--eco)]" />
+              Alpine-Eco Workflow
             </div>
-            <p className="mt-6 text-sm leading-relaxed text-[color:var(--mid-navy)]">
-              Quotes flow to invoices, invoices to deliveries, and every job card lands with the workshop —
-              tracked from the first estimate to the last delivery.
+
+            <h2 className="mt-8 font-serif text-5xl leading-[1.1] text-[color:var(--ink)] lg:text-6xl">
+              The <em className="text-[color:var(--royal)]">accounting tool</em> for a busy workshop.
+            </h2>
+
+            <p className="mt-6 max-w-md text-sm leading-relaxed text-[color:var(--mid-navy)]">
+              Quotes become invoices. Invoices become delivery notes. Job cards keep the floor on track —
+              every step logged from first estimate to final handover.
             </p>
-            <div className="mt-10 h-[1px] w-16 bg-[color:var(--royal)]" />
-            <div className="mt-4 label-caps">Alpine-Eco · Est. 2026</div>
+
+            <div className="mt-10 flex flex-wrap items-center gap-x-2 gap-y-2">
+              {["Quotations", "Invoices", "Delivery", "Job Cards"].map((step, i) => (
+                <span key={step} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-[color:var(--muted-navy)]">→</span>}
+                  <span
+                    className="rounded border bg-white/70 px-3 py-1.5 text-[11px] font-medium text-[color:var(--mid-navy)] backdrop-blur-sm"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    {step}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-end justify-between gap-6 border-t pt-8" style={{ borderColor: "rgba(27,63,190,0.12)" }}>
+            <div>
+              <div className="h-[2px] w-12 bg-[color:var(--royal)]" />
+              <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-navy)]">
+                Alpine-Eco · Est. 2026
+              </p>
+            </div>
+            <p className="font-serif text-2xl italic tracking-wide text-[color:var(--royal)]">
+              Built by Muzi
+            </p>
           </div>
         </div>
       </div>
