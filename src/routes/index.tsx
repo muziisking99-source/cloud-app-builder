@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useAuth } from "@/lib/auth";
-import { useDocuments } from "@/lib/queries";
+import { useDocuments, useIsAdmin } from "@/lib/queries";
 import { useCountUp } from "@/hooks/useCountUp";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
@@ -25,6 +25,7 @@ function isOverdue(d: any) {
 function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
   const { data: docs, isPending } = useDocuments(!!user);
 
   const { stats, recent } = useMemo(() => {
@@ -48,7 +49,13 @@ function Dashboard() {
     {
       label: "Unpaid Invoices",
       value: stats.unpaid,
-      sub: stats.overdue > 0 ? `${money(stats.unpaidTotal)} · ${stats.overdue} overdue` : money(stats.unpaidTotal) + " total",
+      sub: isAdmin
+        ? stats.overdue > 0
+          ? `${money(stats.unpaidTotal)} · ${stats.overdue} overdue`
+          : money(stats.unpaidTotal) + " total"
+        : stats.overdue > 0
+          ? `${stats.overdue} overdue`
+          : "awaiting payment",
       Icon: Receipt,
       tone: stats.overdue > 0 ? "var(--danger)" : "var(--amber-warn)",
       to: "/invoices",
@@ -117,52 +124,89 @@ function Dashboard() {
             onAction={() => navigate({ to: "/quotes/new" })}
           />
         ) : (
-          <table className="content-fade w-full">
-            <thead>
-              <tr className="text-left" style={{ borderBottom: "1px solid var(--border)" }}>
-                <Th>Document</Th>
-                <Th>Customer</Th>
-                <Th>Date</Th>
-                <Th className="text-right">Amount</Th>
-                <Th>Status</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((d: any) => (
-                <tr
-                  key={d.id}
-                  onClick={() => navigate(linkFor(d))}
-                  className="group row-underline cursor-pointer border-b transition-colors hover:bg-[color:var(--offwhite)]"
-                  style={{ borderColor: "var(--border)" }}
-                >
-                  <td className="px-6 py-4">
-                    <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">
-                      {d.doc_number}
-                    </span>
-                    <div className="mt-1 text-[11px] text-[color:var(--muted-navy)]">{DOC_LABEL[d.doc_type]}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-[color:var(--ink)]">{d.customer_name}</div>
-                    <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-[color:var(--mid-navy)]">{fmtDate(d.doc_date)}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium text-[color:var(--ink)]">{money(d.total)}</td>
-                  <td className="px-6 py-4"><StatusBadge status={d.status} /></td>
-                  <td className="px-6 py-4">
-                    <Link
-                      {...(linkFor(d) as any)}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--royal)] opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      Open <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </td>
+          <>
+            {/* Desktop table */}
+            <table className="content-fade hidden w-full md:table">
+              <thead>
+                <tr className="text-left" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <Th>Document</Th>
+                  <Th>Customer</Th>
+                  <Th>Date</Th>
+                  <Th className="text-right">Amount</Th>
+                  <Th>Status</Th>
+                  <Th />
                 </tr>
+              </thead>
+              <tbody>
+                {recent.map((d: any) => (
+                  <tr
+                    key={d.id}
+                    onClick={() => navigate(linkFor(d))}
+                    className="group row-underline cursor-pointer border-b transition-colors hover:bg-[color:var(--offwhite)]"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">
+                        {d.doc_number}
+                      </span>
+                      <div className="mt-1 text-[11px] text-[color:var(--muted-navy)]">{DOC_LABEL[d.doc_type]}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-[color:var(--ink)]">{d.customer_name}</div>
+                      <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[color:var(--mid-navy)]">{fmtDate(d.doc_date)}</td>
+                    <td className="px-6 py-4 text-right text-sm font-medium text-[color:var(--ink)]">{money(d.total)}</td>
+                    <td className="px-6 py-4"><StatusBadge status={d.status} /></td>
+                    <td className="px-6 py-4">
+                      <Link
+                        {...(linkFor(d) as any)}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--royal)] opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        Open <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Mobile cards */}
+            <div className="content-fade divide-y md:hidden" style={{ borderColor: "var(--border)" }}>
+              {recent.map((d: any) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => navigate(linkFor(d))}
+                  className="w-full p-4 text-left transition-colors active:bg-[color:var(--offwhite)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">
+                        {d.doc_number}
+                      </span>
+                      <div className="mt-1 text-[11px] text-[color:var(--muted-navy)]">{DOC_LABEL[d.doc_type]}</div>
+                    </div>
+                    <StatusBadge status={d.status} />
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-[color:var(--ink)]">{d.customer_name}</div>
+                  {d.customer_email && (
+                    <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
+                  )}
+                  <div className="mt-3 flex items-center justify-between text-xs text-[color:var(--mid-navy)]">
+                    <span>{fmtDate(d.doc_date)}</span>
+                    <span className="font-medium text-[color:var(--ink)]">{money(d.total)}</span>
+                  </div>
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
+      </div>
+
+      <div className="mt-10 select-none text-center text-sm font-bold uppercase tracking-[0.28em] text-[color:var(--muted-navy)]/70">
+        Built by Muzi
       </div>
     </div>
   );

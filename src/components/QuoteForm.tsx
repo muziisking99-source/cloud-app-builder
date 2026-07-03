@@ -191,7 +191,8 @@ export function QuoteForm({
       <div className="mt-10">
         <div className="label-caps mb-3">Line Items</div>
         <div className="rounded-md border" style={{ borderColor: "var(--border)" }}>
-          <div className="grid grid-cols-[1fr_80px_120px_120px_40px] items-center gap-3 border-b bg-[color:var(--offwhite)] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-navy)]" style={{ borderColor: "var(--border)" }}>
+          {/* Desktop column headers */}
+          <div className="hidden grid-cols-[1fr_80px_120px_120px_40px] items-center gap-3 border-b bg-[color:var(--offwhite)] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-navy)] md:grid" style={{ borderColor: "var(--border)" }}>
             <div>Description</div>
             <div className="text-center">Qty</div>
             <div className="text-right">Unit Price</div>
@@ -207,36 +208,87 @@ export function QuoteForm({
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ type: "spring", stiffness: 400, damping: 40 }}
-              className="group grid grid-cols-[1fr_80px_120px_120px_40px] items-center gap-3 overflow-hidden border-b px-4 py-2.5"
+              className="group overflow-hidden border-b"
               style={{ borderColor: "var(--border)" }}
             >
-              <input
-                ref={(el) => { rowInputs.current[it._id] = el; }}
-                value={it.description}
-                onChange={(e) => updateItem(it._id, { description: e.target.value })}
-                placeholder="Item description"
-                className="border-b bg-transparent py-1 text-sm outline-none focus:border-[color:var(--royal)]"
-                style={{ borderColor: "var(--border)" }}
-              />
-              <NumberInput
-                value={it.quantity}
-                onCommit={(v) => updateItem(it._id, { quantity: v })}
-                className="border-b bg-transparent py-1 text-center text-sm outline-none focus:border-[color:var(--royal)]"
-                align="center"
-              />
-              <MoneyInput
-                value={it.unit_price}
-                onCommit={(v) => updateItem(it._id, { unit_price: v })}
-              />
-              <div className="rounded bg-[color:var(--offwhite)] px-2 py-1 text-right text-sm">{money(it.total_price)}</div>
-              <button
-                onClick={() => removeItem(it._id)}
-                className="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-                title="Remove line item"
-                aria-label="Remove line item"
-              >
-                <Trash2 className="h-4 w-4 text-[color:var(--danger)]" />
-              </button>
+              {/* Mobile card layout */}
+              <div className="space-y-3 p-4 md:hidden">
+                <div className="flex items-start justify-between gap-2">
+                  <input
+                    ref={(el) => { rowInputs.current[it._id] = el; }}
+                    value={it.description}
+                    onChange={(e) => updateItem(it._id, { description: e.target.value })}
+                    placeholder="Item description"
+                    className="min-h-11 flex-1 border-b bg-transparent py-2 text-sm outline-none focus:border-[color:var(--royal)]"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it._id)}
+                    title="Remove line item"
+                    aria-label="Remove line item"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded border text-[color:var(--danger)]"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <label className="block">
+                    <div className="label-caps mb-1">Qty</div>
+                    <NumberInput
+                      value={it.quantity}
+                      onCommit={(v) => updateItem(it._id, { quantity: v })}
+                      className="min-h-11 w-full rounded border bg-white px-2 text-center text-sm outline-none focus:border-[color:var(--royal)]"
+                      align="center"
+                    />
+                  </label>
+                  <label className="block">
+                    <div className="label-caps mb-1">Unit</div>
+                    <MoneyInput
+                      value={it.unit_price}
+                      onCommit={(v) => updateItem(it._id, { unit_price: v })}
+                      mobile
+                    />
+                  </label>
+                  <div>
+                    <div className="label-caps mb-1">Total</div>
+                    <div className="flex min-h-11 items-center justify-end rounded bg-[color:var(--offwhite)] px-2 text-sm font-medium">{money(it.total_price)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop grid layout */}
+              <div className="hidden grid-cols-[1fr_80px_120px_120px_40px] items-center gap-3 px-4 py-2.5 md:grid">
+                <input
+                  ref={(el) => { rowInputs.current[it._id] = el; }}
+                  value={it.description}
+                  onChange={(e) => updateItem(it._id, { description: e.target.value })}
+                  placeholder="Item description"
+                  className="border-b bg-transparent py-1 text-sm outline-none focus:border-[color:var(--royal)]"
+                  style={{ borderColor: "var(--border)" }}
+                />
+                <NumberInput
+                  value={it.quantity}
+                  onCommit={(v) => updateItem(it._id, { quantity: v })}
+                  className="border-b bg-transparent py-1 text-center text-sm outline-none focus:border-[color:var(--royal)]"
+                  align="center"
+                />
+                <MoneyInput
+                  value={it.unit_price}
+                  onCommit={(v) => updateItem(it._id, { unit_price: v })}
+                />
+                <div className="rounded bg-[color:var(--offwhite)] px-2 py-1 text-right text-sm">{money(it.total_price)}</div>
+                <button
+                  type="button"
+                  onClick={() => removeItem(it._id)}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                  title="Remove line item"
+                  aria-label="Remove line item"
+                >
+                  <Trash2 className="h-4 w-4 text-[color:var(--danger)]" />
+                </button>
+              </div>
             </motion.div>
           ))}
           </AnimatePresence>
@@ -335,7 +387,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /** Money field that shows a raw number while focused and formats (R 4,250.00) on blur. */
-function MoneyInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function MoneyInput({ value, onCommit, mobile }: { value: number; onCommit: (v: number) => void; mobile?: boolean }) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(String(value));
   return (
@@ -349,7 +401,11 @@ function MoneyInput({ value, onCommit }: { value: number; onCommit: (v: number) 
         onCommit(Number(parsed.toFixed(2)));
         setFocused(false);
       }}
-      className="w-full border-b bg-transparent py-1 text-right text-sm outline-none focus:border-[color:var(--royal)]"
+      className={
+        mobile
+          ? "min-h-11 w-full rounded border bg-white px-2 text-right text-sm outline-none focus:border-[color:var(--royal)]"
+          : "w-full border-b bg-transparent py-1 text-right text-sm outline-none focus:border-[color:var(--royal)]"
+      }
       style={{ borderColor: "var(--border)" }}
     />
   );

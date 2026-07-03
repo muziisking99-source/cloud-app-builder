@@ -31,7 +31,12 @@ function AuthPage() {
   }
 
   return (
-    <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
+    <div className="relative grid min-h-screen grid-cols-1 md:grid-cols-2">
+      <div
+        className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 select-none text-sm font-bold uppercase tracking-[0.28em] text-[color:var(--muted-navy)]/70"
+      >
+        Built by Muzi
+      </div>
       <div className="flex items-center justify-center bg-white px-6 py-14">
         <div
           className="animate-rise w-full max-w-md rounded-md border p-10"

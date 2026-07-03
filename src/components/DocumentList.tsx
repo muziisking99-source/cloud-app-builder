@@ -160,89 +160,137 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
           )
         ) : (
           <div className="content-fade max-h-[70vh] overflow-y-auto">
-            <table className="w-full">
-              <thead className="sticky top-0 z-10 bg-white">
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  <Th>Number</Th>
-                  <Th>Customer</Th>
-                  <Th>Date</Th>
-                  {docType === "invoice" && <Th>Due</Th>}
-                  <Th className="text-right">Amount</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Actions</Th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence initial={false} mode="popLayout">
-                  {filtered.map((d: any) => (
-                    <motion.tr
-                      key={d.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      onClick={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })}
-                      className="group row-underline cursor-pointer border-b transition-colors hover:bg-[color:var(--offwhite)]"
-                      style={{ borderColor: "var(--border)" }}
-                    >
-                      <td className="px-6 py-4">
-                        <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">{d.doc_number}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-[color:var(--ink)]">{d.customer_name}</div>
-                        <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[color:var(--mid-navy)]">{fmtDate(d.doc_date)}</td>
-                      {docType === "invoice" && (
-                        <td className="px-6 py-4 text-sm">
-                          {isOverdue(d) ? (
-                            <span className="font-medium text-[color:var(--danger)]">
-                              {fmtDate(d.due_date)}
-                              <span className="ml-1.5 rounded bg-[color:var(--danger)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">overdue</span>
-                            </span>
-                          ) : (
-                            <span className="text-[color:var(--mid-navy)]">{fmtDate(d.due_date)}</span>
-                          )}
+            {/* Desktop table */}
+            <div className="hidden md:block">
+              <table className="w-full">
+                <thead className="sticky top-0 z-10 bg-white">
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    <Th>Number</Th>
+                    <Th>Customer</Th>
+                    <Th>Date</Th>
+                    {docType === "invoice" && <Th>Due</Th>}
+                    <Th className="text-right">Amount</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {filtered.map((d: any) => (
+                      <motion.tr
+                        key={d.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        onClick={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })}
+                        className="group row-underline cursor-pointer border-b transition-colors hover:bg-[color:var(--offwhite)]"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        <td className="px-6 py-4">
+                          <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">{d.doc_number}</span>
                         </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-[color:var(--ink)]">{d.customer_name}</div>
+                          <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[color:var(--mid-navy)]">{fmtDate(d.doc_date)}</td>
+                        {docType === "invoice" && (
+                          <td className="px-6 py-4 text-sm">
+                            {isOverdue(d) ? (
+                              <span className="font-medium text-[color:var(--danger)]">
+                                {fmtDate(d.due_date)}
+                                <span className="ml-1.5 rounded bg-[color:var(--danger)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">overdue</span>
+                              </span>
+                            ) : (
+                              <span className="text-[color:var(--mid-navy)]">{fmtDate(d.due_date)}</span>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-6 py-4 text-right text-sm font-medium text-[color:var(--ink)]">{money(d.total)}</td>
+                        <td className="px-6 py-4"><StatusBadge status={d.status} /></td>
+                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                          <DocActions
+                            doc={d}
+                            detailBase={detailBase}
+                            onView={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })}
+                            onPDF={() => handlePDF(d)}
+                            onConvert={onConvert ? () => handleConvert(d) : undefined}
+                            convertLabel={convertLabel}
+                            markPaid={markPaid}
+                            markDelivered={markDelivered}
+                            onMarkPaid={() => updateStatus.mutate({ id: d.id, status: "paid", docNumber: d.doc_number })}
+                            onCancel={() => cancelInvoice(d)}
+                            onMarkDelivered={() => updateStatus.mutate({ id: d.id, status: "delivered", docNumber: d.doc_number })}
+                          />
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y" style={{ borderColor: "var(--border)" }}>
+              <AnimatePresence initial={false} mode="popLayout">
+                {filtered.map((d: any) => (
+                  <motion.div
+                    key={d.id}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="p-4"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="rounded border border-[color:var(--royal)]/30 px-2 py-0.5 font-mono text-[11px] text-[color:var(--royal)]">{d.doc_number}</span>
+                        <StatusBadge status={d.status} />
+                      </div>
+                      <div className="mt-2 text-sm font-medium text-[color:var(--ink)]">{d.customer_name}</div>
+                      {d.customer_email && (
+                        <div className="text-[11px] text-[color:var(--muted-navy)]">{d.customer_email}</div>
                       )}
-                      <td className="px-6 py-4 text-right text-sm font-medium text-[color:var(--ink)]">{money(d.total)}</td>
-                      <td className="px-6 py-4"><StatusBadge status={d.status} /></td>
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })} title="View">
-                            <IconBtn><Eye className="h-4 w-4" /></IconBtn>
-                          </button>
-                          <button onClick={() => handlePDF(d)} title="PDF">
-                            <IconBtn><FileDown className="h-4 w-4" /></IconBtn>
-                          </button>
-                          {onConvert && (
-                            <button onClick={() => handleConvert(d)} title={convertLabel}>
-                              <IconBtn><ArrowRightCircle className="h-4 w-4 text-[color:var(--royal)]" /></IconBtn>
-                            </button>
-                          )}
-                          {markPaid && d.status !== "paid" && d.status !== "cancelled" && (
-                            <button onClick={() => updateStatus.mutate({ id: d.id, status: "paid", docNumber: d.doc_number })} title="Mark paid">
-                              <IconBtn><CheckCircle2 className="h-4 w-4 text-[color:var(--eco)]" /></IconBtn>
-                            </button>
-                          )}
-                          {markPaid && d.status !== "cancelled" && d.status !== "paid" && (
-                            <button onClick={() => cancelInvoice(d)} title="Cancel invoice">
-                              <IconBtn><XCircle className="h-4 w-4 text-[color:var(--danger)]" /></IconBtn>
-                            </button>
-                          )}
-                          {markDelivered && d.status !== "delivered" && (
-                            <button onClick={() => updateStatus.mutate({ id: d.id, status: "delivered", docNumber: d.doc_number })} title="Mark delivered">
-                              <IconBtn><CheckCircle2 className="h-4 w-4 text-[color:var(--eco)]" /></IconBtn>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              </tbody>
-            </table>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[color:var(--mid-navy)]">
+                        <span>{fmtDate(d.doc_date)}</span>
+                        {docType === "invoice" && d.due_date && (
+                          <span className={isOverdue(d) ? "font-medium text-[color:var(--danger)]" : ""}>
+                            Due {fmtDate(d.due_date)}
+                            {isOverdue(d) && (
+                              <span className="ml-1 rounded bg-[color:var(--danger)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">overdue</span>
+                            )}
+                          </span>
+                        )}
+                        <span className="ml-auto font-medium text-[color:var(--ink)]">{money(d.total)}</span>
+                      </div>
+                    </button>
+                    <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border)" }} onClick={(e) => e.stopPropagation()}>
+                      <DocActions
+                        doc={d}
+                        detailBase={detailBase}
+                        onView={() => navigate({ to: `${detailBase}/$id`, params: { id: d.id } })}
+                        onPDF={() => handlePDF(d)}
+                        onConvert={onConvert ? () => handleConvert(d) : undefined}
+                        convertLabel={convertLabel}
+                        markPaid={markPaid}
+                        markDelivered={markDelivered}
+                        onMarkPaid={() => updateStatus.mutate({ id: d.id, status: "paid", docNumber: d.doc_number })}
+                        onCancel={() => cancelInvoice(d)}
+                        onMarkDelivered={() => updateStatus.mutate({ id: d.id, status: "delivered", docNumber: d.doc_number })}
+                        mobile
+                      />
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </div>
@@ -253,10 +301,74 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
 function Th({ children, className = "" }: { children?: any; className?: string }) {
   return <th className={`bg-white px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-navy)] ${className}`}>{children}</th>;
 }
-function IconBtn({ children }: { children: any }) {
+
+function DocActions({
+  doc,
+  onView,
+  onPDF,
+  onConvert,
+  convertLabel,
+  markPaid,
+  markDelivered,
+  onMarkPaid,
+  onCancel,
+  onMarkDelivered,
+  mobile,
+}: {
+  doc: any;
+  detailBase: string;
+  onView: () => void;
+  onPDF: () => void;
+  onConvert?: () => void;
+  convertLabel?: string;
+  markPaid?: boolean;
+  markDelivered?: boolean;
+  onMarkPaid: () => void;
+  onCancel: () => void;
+  onMarkDelivered: () => void;
+  mobile?: boolean;
+}) {
+  const wrapCls = mobile
+    ? "flex flex-wrap items-center gap-2"
+    : "flex items-center justify-end gap-1.5";
+  const btnCls = mobile ? "h-11 w-11" : "h-8 w-8";
+
+  return (
+    <div className={wrapCls}>
+      <button type="button" onClick={onView} title="View" aria-label="View">
+        <IconBtn className={btnCls}><Eye className="h-4 w-4" /></IconBtn>
+      </button>
+      <button type="button" onClick={onPDF} title="PDF" aria-label="Download PDF">
+        <IconBtn className={btnCls}><FileDown className="h-4 w-4" /></IconBtn>
+      </button>
+      {onConvert && (
+        <button type="button" onClick={onConvert} title={convertLabel} aria-label={convertLabel}>
+          <IconBtn className={btnCls}><ArrowRightCircle className="h-4 w-4 text-[color:var(--royal)]" /></IconBtn>
+        </button>
+      )}
+      {markPaid && doc.status !== "paid" && doc.status !== "cancelled" && (
+        <button type="button" onClick={onMarkPaid} title="Mark paid" aria-label="Mark paid">
+          <IconBtn className={btnCls}><CheckCircle2 className="h-4 w-4 text-[color:var(--eco)]" /></IconBtn>
+        </button>
+      )}
+      {markPaid && doc.status !== "cancelled" && doc.status !== "paid" && (
+        <button type="button" onClick={onCancel} title="Cancel invoice" aria-label="Cancel invoice">
+          <IconBtn className={btnCls}><XCircle className="h-4 w-4 text-[color:var(--danger)]" /></IconBtn>
+        </button>
+      )}
+      {markDelivered && doc.status !== "delivered" && (
+        <button type="button" onClick={onMarkDelivered} title="Mark delivered" aria-label="Mark delivered">
+          <IconBtn className={btnCls}><CheckCircle2 className="h-4 w-4 text-[color:var(--eco)]" /></IconBtn>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function IconBtn({ children, className = "h-8 w-8" }: { children: any; className?: string }) {
   return (
     <span
-      className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border text-[color:var(--mid-navy)] transition-colors hover:bg-[color:var(--offwhite)]"
+      className={`inline-flex items-center justify-center rounded-[4px] border text-[color:var(--mid-navy)] transition-colors hover:bg-[color:var(--offwhite)] ${className}`}
       style={{ borderColor: "var(--border)" }}
     >
       {children}

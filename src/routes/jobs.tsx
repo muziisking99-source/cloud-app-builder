@@ -236,7 +236,7 @@ function JobCards() {
                           <button
                             onClick={() => removeTask(t)}
                             aria-label="Delete task"
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                           >
                             <Trash2 className="h-4 w-4 text-[color:var(--danger)]" />
                           </button>
@@ -247,13 +247,13 @@ function JobCards() {
 
                   <form
                     onSubmit={(e) => { e.preventDefault(); addTask(j.id); }}
-                    className="mt-2 flex items-center gap-2"
+                    className="mt-2 flex flex-wrap items-center gap-2"
                   >
                     <input
                       value={draftTask[j.id] ?? ""}
                       onChange={(e) => setDraftTask((p) => ({ ...p, [j.id]: e.target.value }))}
                       placeholder="Add a task…"
-                      className="h-11 flex-1 rounded border bg-transparent px-3 text-sm outline-none transition-colors focus:border-[color:var(--royal)]"
+                      className="h-11 min-w-0 flex-1 basis-full rounded border bg-transparent px-3 text-sm outline-none transition-colors focus:border-[color:var(--royal)] sm:basis-auto"
                       style={{ borderColor: "var(--border)" }}
                     />
                     <button

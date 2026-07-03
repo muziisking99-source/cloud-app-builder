@@ -51,15 +51,17 @@ export function DocumentDetail({ id, listLabel, listTo, extraCards, actions, pdf
           <h1 className="page-title mt-1 font-serif text-4xl leading-none">{doc.doc_number}</h1>
           <div className="mt-3"><StatusBadge status={doc.status} /></div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
           <button
             onClick={handlePDF}
-            className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mid-navy)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
+            className="press inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mid-navy)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97] sm:flex-none"
             style={{ borderColor: "var(--border)" }}
           >
             <FileDown className="h-4 w-4" /> PDF
           </button>
-          {actions?.(doc, items)}
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto [&>button]:min-h-11 [&>button]:flex-1 [&>button]:justify-center sm:[&>button]:flex-none">
+            {actions?.(doc, items)}
+          </div>
         </div>
       </div>
 
@@ -81,7 +83,8 @@ export function DocumentDetail({ id, listLabel, listTo, extraCards, actions, pdf
 
       {items.length > 0 && (
         <div className="mt-8 rounded-md border bg-white" style={{ borderColor: "var(--border)" }}>
-          <table className="w-full">
+          {/* Desktop table */}
+          <table className="hidden w-full sm:table">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-navy)]">Description</th>
@@ -101,8 +104,32 @@ export function DocumentDetail({ id, listLabel, listTo, extraCards, actions, pdf
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-6 py-4">
-            <div className="w-72">
+
+          {/* Mobile cards */}
+          <div className="divide-y sm:hidden" style={{ borderColor: "var(--border)" }}>
+            {items.map((i: any) => (
+              <div key={i.id} className="p-4">
+                <div className="text-sm font-medium text-[color:var(--ink)]">{i.description}</div>
+                <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <div className="label-caps mb-1">Qty</div>
+                    <div className="text-sm text-[color:var(--ink)]">{Number(i.quantity)}</div>
+                  </div>
+                  <div>
+                    <div className="label-caps mb-1">Unit</div>
+                    <div className="text-sm text-[color:var(--ink)]">{money(i.unit_price)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="label-caps mb-1">Total</div>
+                    <div className="text-sm font-medium text-[color:var(--ink)]">{money(i.total_price)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end px-4 py-4 sm:px-6">
+            <div className="w-full sm:w-72">
               <div className="flex justify-between py-1 text-sm text-[color:var(--mid-navy)]"><span>Subtotal</span><span>{money(doc.subtotal)}</span></div>
               <div className="flex justify-between py-1 text-sm text-[color:var(--mid-navy)]"><span>Tax ({doc.tax_rate}%)</span><span>{money(doc.tax_amount)}</span></div>
               <div className="mt-2 flex items-baseline justify-between border-t pt-2" style={{ borderColor: "var(--border)" }}>
