@@ -205,7 +205,7 @@ function Dashboard() {
         )}
       </div>
 
-      <div className="mt-10 select-none text-center text-sm font-bold uppercase tracking-[0.28em] text-[color:var(--muted-navy)]/70">
+      <div className="mt-10 select-none text-center font-serif text-2xl italic tracking-wide text-[color:var(--muted-navy)]/70">
         Built by Muzi
       </div>
     </div>

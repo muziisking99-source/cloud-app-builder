@@ -33,7 +33,7 @@ function AuthPage() {
   return (
     <div className="relative grid min-h-screen grid-cols-1 md:grid-cols-2">
       <div
-        className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 select-none text-sm font-bold uppercase tracking-[0.28em] text-[color:var(--muted-navy)]/70"
+        className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 select-none font-serif text-2xl italic tracking-wide text-[color:var(--muted-navy)]/70"
       >
         Built by Muzi
       </div>
