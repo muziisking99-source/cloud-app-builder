@@ -39,12 +39,17 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, onConv
 
   async function handlePDF(doc: any) {
     const { data: items } = await supabase.from("line_items").select("*").eq("document_id", doc.id).order("sort_order");
+    let parentRef: string | null = null;
+    if (doc.doc_type === "delivery_note" && doc.parent_id) {
+      const { data: parent } = await supabase.from("documents").select("doc_number").eq("id", doc.parent_id).maybeSingle();
+      parentRef = parent?.doc_number ?? null;
+    }
     generatePDF(doc, (items ?? []).map((i: any) => ({
       description: i.description,
       quantity: Number(i.quantity),
       unit_price: Number(i.unit_price),
       total_price: Number(i.total_price),
-    })));
+    })), { parentRef });
   }
 
   async function updateStatus(id: string, status: string) {
