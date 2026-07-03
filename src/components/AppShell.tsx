@@ -10,6 +10,8 @@ import {
   ClipboardList,
   History,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 
 type NavItem = { to: string; label: string; icon: typeof FileText; badgeKey?: string };
@@ -28,6 +30,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [profileName, setProfileName] = useState<string>("");
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -62,17 +69,52 @@ export function AppShell({ children }: { children?: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-white">
-      <aside
-        className="hidden w-[260px] shrink-0 flex-col border-r bg-white md:flex"
+      {/* Mobile top bar */}
+      <header
+        className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-white px-4 md:hidden"
         style={{ borderColor: "var(--border)" }}
       >
-        <div className="px-6 py-7">
-          <div className="font-serif text-2xl leading-none text-[color:var(--ink)]">
-            Alpine-Eco
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          className="rounded-md p-2 text-[color:var(--ink)] hover:bg-[color:var(--offwhite)]"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="font-serif text-lg text-[color:var(--ink)]">Alpine-Eco</div>
+        <div className="w-9" />
+      </header>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col border-r bg-white transition-transform duration-200 md:static md:flex md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+        style={{ borderColor: "var(--border)" }}
+      >
+        <div className="flex items-start justify-between px-6 py-7">
+          <div>
+            <div className="font-serif text-2xl leading-none text-[color:var(--ink)]">
+              Alpine-Eco
+            </div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-navy)]">
+              Workflow
+            </div>
           </div>
-          <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-navy)]">
-            Workflow
-          </div>
+          <button
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+            className="rounded-md p-1.5 text-[color:var(--muted-navy)] hover:bg-[color:var(--offwhite)] md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="px-3">
@@ -129,7 +171,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 bg-white">
+      <main className="min-w-0 flex-1 bg-white pt-14 md:pt-0">
         <div className="mx-auto max-w-[1280px] px-6 py-8 md:px-10 md:py-10">
           {children ?? <Outlet />}
         </div>
