@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { fmtDate } from "@/lib/format";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, FileDown } from "lucide-react";
+import { generatePDF } from "@/lib/pdf";
 
 export const Route = createFileRoute("/jobs")({
   component: () => (
@@ -131,13 +132,23 @@ function JobCards() {
                   </button>
                 </div>
               ))}
-              <button
-                onClick={() => addTask(j.id)}
-                className="flex w-full items-center justify-center gap-2 rounded border border-dashed py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--royal)] hover:bg-[color:var(--offwhite)]"
-                style={{ borderColor: "var(--royal)" }}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Task
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => addTask(j.id)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded border border-dashed py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--royal)] hover:bg-[color:var(--offwhite)]"
+                  style={{ borderColor: "var(--royal)" }}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Task
+                </button>
+                <button
+                  onClick={() => generatePDF(j, [], { tasks: tasksMap[j.id] ?? [] })}
+                  className="flex items-center justify-center gap-2 rounded border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mid-navy)] hover:bg-[color:var(--offwhite)]"
+                  style={{ borderColor: "var(--border)" }}
+                  title="Download PDF"
+                >
+                  <FileDown className="h-3.5 w-3.5" /> PDF
+                </button>
+              </div>
             </div>
           </div>
         ))}
