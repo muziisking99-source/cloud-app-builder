@@ -265,7 +265,7 @@ function JobCards() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => generatePDF(j, [], { tasks: tasksMap[j.id] ?? [] })}
+                      onClick={() => void generatePDF(j, [], { tasks: tasksMap[j.id] ?? [] })}
                       className="flex h-11 w-11 items-center justify-center rounded border text-[color:var(--mid-navy)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
                       style={{ borderColor: "var(--border)" }}
                       title="Download PDF"

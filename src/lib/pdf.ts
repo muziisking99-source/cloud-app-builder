@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoSrc from "@/assets/alpine-eco-logo.png";
 import { DOC_LABEL, money, fmtDate } from "./format";
 
 type Doc = {
@@ -35,12 +36,44 @@ type Task = {
 };
 
 const COMPANY = {
-  name: "Alpine-Eco",
-  tagline: "Notebooks and diaries",
-  address: "22 Stevens Rd Stafford, Johannesburg",
+  name: "Alpine-Eco Notebooks and Diaries",
+  address: "22 Stevens Road, Stafford, Johannesburg, South Africa, 2197",
   phone: "011 493 0113",
-  email: "info@alpine-eco.co.za",
+  email: "accounts@alpine-eco.co.za",
+  regNo: "2013/128582/07",
+  vatNo: "4230280879",
 };
+
+const LOGO_NATURAL_W = 645;
+const LOGO_NATURAL_H = 311;
+const LOGO_DISPLAY_W = 135;
+
+const BANKING = {
+  heading: "Banking Details",
+  accountHolder: "F. Mahomed",
+  bank: "Capitec",
+  accountNumber: "1582338785",
+  branchCode: "470 000",
+};
+
+let cachedLogoDataUrl: string | undefined;
+const logoLoadPromise = fetch(logoSrc)
+  .then((r) => r.blob())
+  .then(
+    (blob) =>
+      new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          cachedLogoDataUrl = reader.result as string;
+          resolve(cachedLogoDataUrl);
+        };
+        reader.readAsDataURL(blob);
+      }),
+  );
+
+async function getLogoDataUrl(): Promise<string> {
+  return cachedLogoDataUrl ?? logoLoadPromise;
+}
 
 const ROYAL: [number, number, number] = [27, 63, 190];
 const ROYAL_LIGHT: [number, number, number] = [235, 240, 252];
@@ -69,31 +102,71 @@ const TABLE_BODY = {
 };
 const TABLE_ALT = { fillColor: OFFWHITE };
 
+/** Company contact block — reused in the PDF header beside the logo. */
+function drawCompanyBlock(pdf: jsPDF, x: number, startY: number): number {
+  let y = startY;
+  pdf.setFont("times", "normal");
+  pdf.setFontSize(11);
+  pdf.setTextColor(...INK);
+  pdf.text(COMPANY.name, x, y);
+  y += 14;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  const lines = [
+    "22 Stevens Road",
+    "Stafford",
+    "Johannesburg, South Africa, 2197",
+    `Company Reg No: ${COMPANY.regNo}`,
+    `VAT Reg No: ${COMPANY.vatNo}`,
+    `Phone No: ${COMPANY.phone}`,
+    `Email: ${COMPANY.email}`,
+  ];
+  for (const line of lines) {
+    pdf.text(line, x, y);
+    y += 11;
+  }
+  return y;
+}
+
+/** Banking details — quotes and invoices only. */
+function drawBankingDetails(pdf: jsPDF, startY: number): number {
+  let y = startY;
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.setTextColor(...MUTED);
+  pdf.text(BANKING.heading.toUpperCase(), 40, y);
+  y += 16;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.setTextColor(...MID);
+  const lines = [
+    BANKING.accountHolder,
+    BANKING.bank,
+    `Account number: ${BANKING.accountNumber}`,
+    `Branch Code: ${BANKING.branchCode}`,
+  ];
+  for (const line of lines) {
+    pdf.text(line, 40, y);
+    y += 14;
+  }
+  return y + 8;
+}
+
 /** Draw branded header; returns Y below the divider for the body section. */
-function drawHeader(pdf: jsPDF, doc: Doc, W: number): number {
+function drawHeader(pdf: jsPDF, doc: Doc, W: number, logoDataUrl: string): number {
   pdf.setFillColor(...ROYAL);
   pdf.rect(0, 0, W, 6, "F");
 
-  // Accent mark beside company name
-  pdf.setFillColor(...ECO);
-  pdf.roundedRect(40, 44, 8, 8, 2, 2, "F");
+  const logoH = LOGO_DISPLAY_W * (LOGO_NATURAL_H / LOGO_NATURAL_W);
+  const logoY = 16;
+  pdf.addImage(logoDataUrl, "PNG", 40, logoY, LOGO_DISPLAY_W, logoH);
 
-  pdf.setFont("times", "normal");
-  pdf.setFontSize(24);
-  pdf.setTextColor(...INK);
-  pdf.text(COMPANY.name, 56, 54);
-
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
-  pdf.setTextColor(...MID);
-  pdf.text(COMPANY.tagline, 56, 70);
-
-  pdf.setFontSize(8);
-  pdf.setTextColor(...MUTED);
-  let contactY = 86;
-  pdf.text(COMPANY.address, 40, contactY);
-  contactY += 12;
-  pdf.text(`${COMPANY.phone}  ·  ${COMPANY.email}`, 40, contactY);
+  const textX = 40 + LOGO_DISPLAY_W + 18;
+  const companyBottom = drawCompanyBlock(pdf, textX, 26);
+  const leftBottom = Math.max(logoY + logoH, companyBottom);
 
   // Right column — document type & meta
   pdf.setFont("times", "bold");
@@ -106,7 +179,7 @@ function drawHeader(pdf: jsPDF, doc: Doc, W: number): number {
   pdf.text(doc.doc_number, W - 40, 74, { align: "right" });
   pdf.text(fmtDate(doc.doc_date), W - 40, 90, { align: "right" });
 
-  const dividerY = 118;
+  const dividerY = Math.max(leftBottom, 100) + 14;
   pdf.setDrawColor(...ROYAL);
   pdf.setLineWidth(1);
   pdf.line(40, dividerY, W - 40, dividerY);
@@ -311,12 +384,13 @@ function drawDeliverySignatures(pdf: jsPDF, W: number, startY: number) {
   pdf.text("Goods received in good condition", rightX, dateY + 26);
 }
 
-export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; parentRef?: string | null }) {
+export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; parentRef?: string | null }) {
+  const logoDataUrl = await getLogoDataUrl();
   const pdf = new jsPDF({ unit: "pt", format: "letter" });
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
 
-  const bodyTop = drawHeader(pdf, doc, W);
+  const bodyTop = drawHeader(pdf, doc, W, logoDataUrl);
   const custHeading =
     doc.doc_type === "delivery_note" ? "DELIVER TO" :
     doc.doc_type === "job_card" ? "CUSTOMER" : "BILL TO";
@@ -405,7 +479,7 @@ export function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Task[]; 
     // quote & invoice
     const endY = drawItemsTable(pdf, items, tableStart, true);
     drawTotals(pdf, doc, W, endY + 24);
-    let y = endY + 110;
+    let y = drawBankingDetails(pdf, endY + 110);
 
     if (doc.notes) {
       pdf.setFont("helvetica", "bold");

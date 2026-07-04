@@ -72,7 +72,7 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
       const { data: parent } = await supabase.from("documents").select("doc_number").eq("id", doc.parent_id).maybeSingle();
       parentRef = parent?.doc_number ?? null;
     }
-    generatePDF(doc, (items ?? []).map((i: any) => ({
+    await generatePDF(doc, (items ?? []).map((i: any) => ({
       description: i.description,
       quantity: Number(i.quantity),
       unit_price: Number(i.unit_price),

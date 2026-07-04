@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { AlpineEcoLogo } from "@/components/AlpineEcoLogo";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -43,8 +44,7 @@ function AuthPage() {
           style={{ borderColor: "rgba(27,63,190,0.14)" }}
         >
           <div>
-            <div className="font-serif text-4xl leading-none text-[color:var(--ink)]">Alpine-Eco</div>
-            <div className="mt-1 font-serif text-lg italic text-[color:var(--muted-navy)]">Workflow</div>
+            <AlpineEcoLogo width={180} />
           </div>
           <p className="mt-6 text-sm text-[color:var(--muted-navy)]">
             {mode === "signin" ? "Sign in to access the workshop." : "Create your staff account."}
@@ -121,6 +121,9 @@ function AuthPage() {
           </span>
         </div>
         <div className="relative text-center">
+          <div className="mb-6 flex justify-center">
+            <AlpineEcoLogo width={160} />
+          </div>
           <p className="font-serif text-2xl leading-snug text-[color:var(--ink)]">
             Quotes to invoices, invoices to delivery — <em className="text-[color:var(--royal)]">tracked in one place.</em>
           </p>
@@ -156,6 +159,8 @@ function AuthPage() {
 
         <div className="relative flex h-full min-h-screen flex-col justify-between px-12 py-16 lg:px-20">
           <div className="max-w-lg">
+            <AlpineEcoLogo width={200} className="mb-8" />
+
             <div className="inline-flex items-center gap-2 rounded-full border bg-white/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--royal)] backdrop-blur-sm" style={{ borderColor: "rgba(27,63,190,0.2)" }}>
               <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--eco)]" />
               Alpine-Eco Workflow

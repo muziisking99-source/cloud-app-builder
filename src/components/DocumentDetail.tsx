@@ -28,8 +28,8 @@ export function DocumentDetail({ id, listLabel, listTo, extraCards, actions, pdf
   if (isPending || !docData) return <DetailSkeleton />;
   const doc = docData;
 
-  function handlePDF() {
-    generatePDF(
+  async function handlePDF() {
+    await generatePDF(
       doc,
       items.map((i: any) => ({
         description: i.description,

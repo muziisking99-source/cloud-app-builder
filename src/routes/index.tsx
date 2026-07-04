@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { money, fmtDate, DOC_LABEL } from "@/lib/format";
 import { FileText, Receipt, ClipboardList, Truck, ArrowRight, LayoutDashboard } from "lucide-react";
+import { AlpineEcoLogo } from "@/components/AlpineEcoLogo";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -68,9 +69,12 @@ function Dashboard() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title font-serif text-4xl leading-none">Dashboard</h1>
-          <p className="mt-2 text-sm text-[color:var(--muted-navy)]">Overview of your factory floor today.</p>
+        <div className="flex flex-wrap items-center gap-5">
+          <AlpineEcoLogo width={130} />
+          <div>
+            <h1 className="page-title font-serif text-4xl leading-none">Dashboard</h1>
+            <p className="mt-2 text-sm text-[color:var(--muted-navy)]">Overview of your factory floor today.</p>
+          </div>
         </div>
         <button
           onClick={() => navigate({ to: "/quotes/new" })}
