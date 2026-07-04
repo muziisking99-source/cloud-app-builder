@@ -19,6 +19,9 @@ type Doc = {
   tax_rate: number;
   tax_amount: number;
   total: number;
+  deposit_required?: number;
+  deposit_paid?: boolean;
+  amount_paid?: number;
 };
 
 type Item = {
@@ -298,9 +301,12 @@ function drawItemsTable(pdf: jsPDF, items: Item[], startY: number, withPricing: 
   return (pdf as any).lastAutoTable.finalY as number;
 }
 
-function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number) {
+function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number): number {
   const rightX = W - 40;
   const labelX = W - 220;
+  const amountPaid = Number(doc.amount_paid || 0);
+  const balanceDue = Math.max(0, Number(doc.total) - amountPaid);
+
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   pdf.setTextColor(...MID);
@@ -309,9 +315,27 @@ function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number) {
   pdf.text(`Tax (${doc.tax_rate}%)`, labelX, startY + 16);
   pdf.text(money(doc.tax_amount), rightX, startY + 16, { align: "right" });
 
-  // Royal band for total
-  const bandY = startY + 30;
+  let bandY = startY + 30;
   const bandH = 32;
+
+  if (doc.doc_type === "invoice" && amountPaid > 0) {
+    pdf.text("Total", labelX, bandY);
+    pdf.text(money(doc.total), rightX, bandY, { align: "right" });
+    bandY += 18;
+    pdf.setTextColor(...ECO);
+    pdf.text("Less paid", labelX, bandY);
+    pdf.text(`-${money(amountPaid)}`, rightX, bandY, { align: "right" });
+    bandY += 24;
+    pdf.setFillColor(...ROYAL);
+    pdf.roundedRect(labelX - 8, bandY, rightX - labelX + 8, bandH, 3, 3, "F");
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(14);
+    pdf.setTextColor(...WHITE);
+    pdf.text("Balance Due", labelX, bandY + 21);
+    pdf.text(money(balanceDue), rightX, bandY + 21, { align: "right" });
+    return bandY + bandH + 8;
+  }
+
   pdf.setFillColor(...ROYAL);
   pdf.roundedRect(labelX - 8, bandY, rightX - labelX + 8, bandH, 3, 3, "F");
   pdf.setFont("times", "bold");
@@ -319,6 +343,24 @@ function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number) {
   pdf.setTextColor(...WHITE);
   pdf.text("Total", labelX, bandY + 21);
   pdf.text(money(doc.total), rightX, bandY + 21, { align: "right" });
+  return bandY + bandH + 8;
+}
+
+/** Deposit line on quote PDFs. */
+function drawQuoteDeposit(pdf: jsPDF, doc: Doc, startY: number): number {
+  const deposit = Number(doc.deposit_required || 0);
+  if (doc.doc_type !== "quote" || deposit <= 0) return startY;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.setTextColor(...MID);
+  pdf.text(`Deposit required: ${money(deposit)}`, 40, startY);
+  if (doc.deposit_paid) {
+    pdf.setTextColor(...ECO);
+    pdf.text("Deposit paid", 40, startY + 14);
+    return startY + 28;
+  }
+  return startY + 20;
 }
 
 function drawFooter(pdf: jsPDF, W: number, terms: string) {
@@ -400,10 +442,11 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
   // Status stamp for paid/overdue invoices — sits below the customer/meta block
   // and reserves its own height so the items table starts beneath it.
   let contentBottom = Math.max(custY, metaY);
-  if (doc.doc_type === "invoice" && (doc.status === "paid" || doc.status === "overdue")) {
+  if (doc.doc_type === "invoice" && (doc.status === "paid" || doc.status === "overdue" || doc.status === "part_paid")) {
     const stampY = contentBottom + 12;
     const stampH = 34;
     if (doc.status === "paid") drawStatusStamp(pdf, W, stampY, "PAID", ECO);
+    else if (doc.status === "part_paid") drawStatusStamp(pdf, W, stampY, "PART PAID", ROYAL);
     else drawStatusStamp(pdf, W, stampY, "OVERDUE", DANGER);
     contentBottom = stampY + stampH;
   }
@@ -478,8 +521,12 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
   } else {
     // quote & invoice
     const endY = drawItemsTable(pdf, items, tableStart, true);
-    drawTotals(pdf, doc, W, endY + 24);
-    let y = drawBankingDetails(pdf, endY + 110);
+    const totalsEnd = drawTotals(pdf, doc, W, endY + 24);
+    let y = totalsEnd + 12;
+    if (doc.doc_type === "quote") {
+      y = drawQuoteDeposit(pdf, doc, y);
+    }
+    y = drawBankingDetails(pdf, y + 8);
 
     if (doc.notes) {
       pdf.setFont("helvetica", "bold");
@@ -510,4 +557,95 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
   }
 
   pdf.save(`${doc.doc_number}.pdf`);
+}
+
+export type StatementInvoice = {
+  doc_number: string;
+  doc_date: string;
+  due_date?: string | null;
+  total: number;
+  amount_paid?: number;
+};
+
+/** Customer statement PDF listing open invoices and total balance due. */
+export async function generateStatementPDF(
+  customerName: string,
+  customerAddress: string | null | undefined,
+  invoices: StatementInvoice[],
+) {
+  const logoDataUrl = await getLogoDataUrl();
+  const pdf = new jsPDF({ unit: "pt", format: "letter" });
+  const W = pdf.internal.pageSize.getWidth();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const headerDoc: Doc = {
+    doc_number: `STMT-${today.replace(/-/g, "")}`,
+    doc_type: "statement",
+    customer_name: customerName,
+    customer_address: customerAddress,
+    doc_date: today,
+    subtotal: 0,
+    tax_rate: 0,
+    tax_amount: 0,
+    total: 0,
+  };
+
+  const bodyTop = drawHeader(pdf, headerDoc, W, logoDataUrl);
+  drawCustomer(pdf, headerDoc, W, bodyTop, "STATEMENT FOR");
+
+  const totalBalance = invoices.reduce(
+    (sum, inv) => sum + Math.max(0, Number(inv.total) - Number(inv.amount_paid || 0)),
+    0,
+  );
+
+  const tableStart = bodyTop + 8;
+  autoTable(pdf, {
+    startY: tableStart,
+    head: [["Invoice", "Date", "Due", "Total", "Paid", "Balance"]],
+    body: invoices.map((inv) => {
+      const paid = Number(inv.amount_paid || 0);
+      const balance = Math.max(0, Number(inv.total) - paid);
+      return [
+        inv.doc_number,
+        fmtDate(inv.doc_date),
+        inv.due_date ? fmtDate(inv.due_date) : "—",
+        money(inv.total),
+        money(paid),
+        money(balance),
+      ];
+    }),
+    theme: "plain",
+    headStyles: TABLE_HEAD,
+    bodyStyles: TABLE_BODY,
+    alternateRowStyles: TABLE_ALT,
+    columnStyles: {
+      3: { halign: "right" },
+      4: { halign: "right" },
+      5: { halign: "right" },
+    },
+    margin: { left: 40, right: 40 },
+  });
+
+  const endY = (pdf as any).lastAutoTable.finalY as number;
+  const rightX = W - 40;
+  const labelX = W - 220;
+  const bandY = endY + 24;
+  const bandH = 32;
+  pdf.setFillColor(...ROYAL);
+  pdf.roundedRect(labelX - 8, bandY, rightX - labelX + 8, bandH, 3, 3, "F");
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(14);
+  pdf.setTextColor(...WHITE);
+  pdf.text("Total Balance Due", labelX, bandY + 21);
+  pdf.text(money(totalBalance), rightX, bandY + 21, { align: "right" });
+
+  drawBankingDetails(pdf, bandY + bandH + 20);
+  drawFooter(
+    pdf,
+    W,
+    "Please settle outstanding balances using the banking details above. Contact us if any item requires clarification.",
+  );
+
+  const safeName = customerName.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "customer";
+  pdf.save(`Statement-${safeName}.pdf`);
 }

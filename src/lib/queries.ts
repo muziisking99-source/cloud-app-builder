@@ -330,3 +330,79 @@ export function useDeleteDocument() {
     },
   });
 }
+
+/** Mark a quote deposit as received. */
+export function useMarkDepositPaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, amount, docNumber }: { id: string; amount: number; docNumber: string }) => {
+      const { error } = await supabase.from("documents").update({ deposit_paid: true }).eq("id", id);
+      if (error) throw error;
+      await logActivity(id, "deposit_paid", `Deposit of R ${amount.toFixed(2)} received`);
+      return docNumber;
+    },
+    onSuccess: (docNumber) => toast.success(`Deposit marked paid on ${docNumber}`),
+    onError: (err: any) => toast.error(err?.message ?? "Could not mark deposit paid"),
+    onSettled: (_d, _e, { id }) => {
+      qc.invalidateQueries({ queryKey: qk.documents });
+      qc.invalidateQueries({ queryKey: qk.document(id) });
+      qc.invalidateQueries({ queryKey: qk.activity(id) });
+    },
+  });
+}
+
+/** Record a partial or full payment on an invoice. */
+export function useRecordPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ doc, amount }: { doc: any; amount: number }) => {
+      const total = Number(doc.total || 0);
+      const currentPaid = Number(doc.amount_paid || 0);
+      const newPaid = Math.min(total, Number((currentPaid + amount).toFixed(2)));
+      const status = newPaid >= total ? "paid" : "part_paid";
+      const { error } = await supabase
+        .from("documents")
+        .update({ amount_paid: newPaid, status })
+        .eq("id", doc.id);
+      if (error) throw error;
+      await logActivity(
+        doc.id,
+        "payment_recorded",
+        `Payment of R ${amount.toFixed(2)} recorded (R ${newPaid.toFixed(2)} total paid)`,
+      );
+      return { docNumber: doc.doc_number as string, status, newPaid };
+    },
+    onSuccess: ({ docNumber, status }) =>
+      toast.success(`${docNumber} ${status === "paid" ? "fully paid" : "payment recorded"}`),
+    onError: (err: any) => toast.error(err?.message ?? "Could not record payment"),
+    onSettled: (_d, _e, { doc }) => {
+      qc.invalidateQueries({ queryKey: qk.documents });
+      qc.invalidateQueries({ queryKey: qk.document(doc.id) });
+      qc.invalidateQueries({ queryKey: qk.activity(doc.id) });
+    },
+  });
+}
+
+/** Mark an invoice fully paid (sets amount_paid = total). */
+export function useMarkInvoicePaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ doc }: { doc: any }) => {
+      const total = Number(doc.total || 0);
+      const { error } = await supabase
+        .from("documents")
+        .update({ amount_paid: total, status: "paid" })
+        .eq("id", doc.id);
+      if (error) throw error;
+      await logActivity(doc.id, "status_changed", "Marked paid");
+      return doc.doc_number as string;
+    },
+    onSuccess: (docNumber) => toast.success(`${docNumber} marked paid`),
+    onError: (err: any) => toast.error(err?.message ?? "Could not mark paid"),
+    onSettled: (_d, _e, { doc }) => {
+      qc.invalidateQueries({ queryKey: qk.documents });
+      qc.invalidateQueries({ queryKey: qk.document(doc.id) });
+      qc.invalidateQueries({ queryKey: qk.activity(doc.id) });
+    },
+  });
+}

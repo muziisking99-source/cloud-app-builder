@@ -1,31 +1,43 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentDetail, InfoCard } from "@/components/DocumentDetail";
 import { DeleteDocButton } from "@/components/DeleteDocButton";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { useDocument, useUpdateStatus, useInvalidateDocuments } from "@/lib/queries";
-import { fmtDate } from "@/lib/format";
-import { CheckCircle2, XCircle, ClipboardList, Truck } from "lucide-react";
+import {
+  useDocument,
+  useInvalidateDocuments,
+  useMarkInvoicePaid,
+  useRecordPayment,
+} from "@/lib/queries";
+import { fmtDate, invoiceBalance, isInvoiceOverdue, money } from "@/lib/format";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CheckCircle2, XCircle, ClipboardList, Truck, Banknote } from "lucide-react";
 
 export const Route = createFileRoute("/invoices/$id")({
   component: InvoiceDetail,
 });
 
-function isOverdue(d: any) {
-  return (
-    ["unpaid", "sent", "overdue"].includes(d.status) && d.due_date && new Date(d.due_date) < new Date()
-  );
-}
-
 function InvoiceDetail() {
   const { id } = Route.useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const updateStatus = useUpdateStatus();
   const invalidateDocuments = useInvalidateDocuments();
   const confirm = useConfirm();
+  const markPaid = useMarkInvoicePaid();
+  const recordPayment = useRecordPayment();
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentDoc, setPaymentDoc] = useState<any>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   async function cancelInvoice(doc: any) {
     const ok = await confirm({
@@ -36,7 +48,37 @@ function InvoiceDetail() {
       destructive: true,
     });
     if (!ok) return;
-    updateStatus.mutate({ id: doc.id, status: "cancelled", docNumber: doc.doc_number });
+    const { error } = await supabase.from("documents").update({ status: "cancelled" }).eq("id", doc.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(`${doc.doc_number} cancelled`);
+      invalidateDocuments();
+    }
+  }
+
+  function openPaymentDialog(doc: any) {
+    const balance = invoiceBalance(doc);
+    setPaymentDoc(doc);
+    setPaymentAmount(balance > 0 ? balance.toFixed(2) : "");
+    setPaymentOpen(true);
+  }
+
+  async function submitPayment() {
+    if (!paymentDoc) return;
+    const amount = Number(paymentAmount.replace(/[^0-9.-]/g, "")) || 0;
+    const balance = invoiceBalance(paymentDoc);
+    if (amount <= 0) {
+      toast.error("Enter a payment amount greater than zero.");
+      return;
+    }
+    if (amount > balance) {
+      toast.error(`Payment cannot exceed the balance due of ${money(balance)}.`);
+      return;
+    }
+    await recordPayment.mutateAsync({ doc: paymentDoc, amount });
+    setPaymentOpen(false);
+    setPaymentDoc(null);
+    setPaymentAmount("");
   }
 
   async function createDeliveryNote(doc: any, items: any[]) {
@@ -62,8 +104,6 @@ function InvoiceDetail() {
   }
 
   async function createJobCard(doc: any) {
-    // Tie the job card back to the originating quote so it stays in the same
-    // order chain; fall back to the invoice itself if there's no parent.
     const linkId = doc.parent_id ?? doc.id;
     const { data: numData } = await supabase.rpc("generate_doc_number", { p_doc_type: "job_card" });
     const { data: jc, error } = await supabase.from("documents").insert({
@@ -80,63 +120,134 @@ function InvoiceDetail() {
   }
 
   return (
-    <DocumentDetail
-      id={id}
-      listLabel="Invoices"
-      listTo="/invoices"
-      extraCards={(doc) => (
-        <>
-          <InfoCard label="Due Date">
-            {doc.due_date ? (
-              <div className={`text-sm ${isOverdue(doc) ? "font-medium text-[color:var(--danger)]" : "text-[color:var(--ink)]"}`}>
-                {fmtDate(doc.due_date)}
-                {isOverdue(doc) && (
-                  <span className="ml-2 rounded bg-[color:var(--danger)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">overdue</span>
+    <>
+      <DocumentDetail
+        id={id}
+        listLabel="Invoices"
+        listTo="/invoices"
+        extraCards={(doc) => {
+          const paid = Number(doc.amount_paid || 0);
+          const balance = invoiceBalance(doc);
+          return (
+            <>
+              {paid > 0 && (
+                <>
+                  <InfoCard label="Paid So Far">
+                    <div className="text-sm font-medium text-[color:var(--eco)]">{money(paid)}</div>
+                  </InfoCard>
+                  <InfoCard label="Balance Due">
+                    <div className={`text-sm font-medium ${balance > 0 ? "text-[color:var(--ink)]" : "text-[color:var(--eco)]"}`}>
+                      {money(balance)}
+                    </div>
+                  </InfoCard>
+                </>
+              )}
+              <InfoCard label="Due Date">
+                {doc.due_date ? (
+                  <div className={`text-sm ${isInvoiceOverdue(doc) ? "font-medium text-[color:var(--danger)]" : "text-[color:var(--ink)]"}`}>
+                    {fmtDate(doc.due_date)}
+                    {isInvoiceOverdue(doc) && (
+                      <span className="ml-2 rounded bg-[color:var(--danger)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">overdue</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[color:var(--muted-navy)]">—</div>
                 )}
-              </div>
-            ) : (
-              <div className="text-sm text-[color:var(--muted-navy)]">—</div>
+              </InfoCard>
+              {doc.parent_id && <ParentDocCard parentId={doc.parent_id} label="Source Quote" detailPath="/quotes/$id" />}
+            </>
+          );
+        }}
+        actions={(doc, items) => (
+          <>
+            {doc.status !== "paid" && doc.status !== "cancelled" && (
+              <>
+                <button
+                  onClick={() => openPaymentDialog(doc)}
+                  className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--royal)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
+                  style={{ borderColor: "var(--royal)" }}
+                >
+                  <Banknote className="h-4 w-4" /> Record Payment
+                </button>
+                <button
+                  onClick={() => markPaid.mutate({ doc })}
+                  disabled={markPaid.isPending}
+                  className="press inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--eco)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition-all hover:brightness-95 active:scale-[0.97] disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Mark Paid
+                </button>
+              </>
             )}
-          </InfoCard>
-          {doc.parent_id && <ParentDocCard parentId={doc.parent_id} label="Source Quote" detailPath="/quotes/$id" />}
-        </>
-      )}
-      actions={(doc, items) => (
-        <>
-          {doc.status !== "paid" && doc.status !== "cancelled" && (
             <button
-              onClick={() => updateStatus.mutate({ id: doc.id, status: "paid", docNumber: doc.doc_number })}
-              className="press inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--eco)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition-all hover:brightness-95 active:scale-[0.97]"
+              onClick={() => createDeliveryNote(doc, items)}
+              className="press inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--royal)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition-all hover:bg-[color:var(--royal-deep)] active:scale-[0.97]"
             >
-              <CheckCircle2 className="h-4 w-4" /> Mark Paid
+              <Truck className="h-4 w-4" /> Create Delivery Note
             </button>
-          )}
-          <button
-            onClick={() => createDeliveryNote(doc, items)}
-            className="press inline-flex items-center gap-2 rounded-[4px] bg-[color:var(--royal)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition-all hover:bg-[color:var(--royal-deep)] active:scale-[0.97]"
-          >
-            <Truck className="h-4 w-4" /> Create Delivery Note
-          </button>
-          <button
-            onClick={() => createJobCard(doc)}
-            className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--royal)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
-            style={{ borderColor: "var(--royal)" }}
-          >
-            <ClipboardList className="h-4 w-4" /> Create Job Card
-          </button>
-          {doc.status !== "paid" && doc.status !== "cancelled" && (
             <button
-              onClick={() => cancelInvoice(doc)}
-              className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--danger)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
-              style={{ borderColor: "var(--danger)" }}
+              onClick={() => createJobCard(doc)}
+              className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--royal)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
+              style={{ borderColor: "var(--royal)" }}
             >
-              <XCircle className="h-4 w-4" /> Cancel Invoice
+              <ClipboardList className="h-4 w-4" /> Create Job Card
             </button>
-          )}
-          <DeleteDocButton doc={doc} listTo="/invoices" label="Delete Invoice" />
-        </>
-      )}
-    />
+            {doc.status !== "paid" && doc.status !== "cancelled" && (
+              <button
+                onClick={() => cancelInvoice(doc)}
+                className="press inline-flex items-center gap-2 rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--danger)] transition-colors hover:bg-[color:var(--offwhite)] active:scale-[0.97]"
+                style={{ borderColor: "var(--danger)" }}
+              >
+                <XCircle className="h-4 w-4" /> Cancel Invoice
+              </button>
+            )}
+            <DeleteDocButton doc={doc} listTo="/invoices" label="Delete Invoice" />
+          </>
+        )}
+      />
+
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">Record Payment</DialogTitle>
+            <DialogDescription>
+              {paymentDoc
+                ? `${paymentDoc.doc_number} · Balance due ${money(invoiceBalance(paymentDoc))}`
+                : "Enter the payment amount received."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2">
+            <label className="label-caps mb-1.5 block">Amount</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              className="w-full rounded border bg-white px-3 py-2 text-sm outline-none focus:border-[color:var(--royal)]"
+              style={{ borderColor: "var(--border)" }}
+              placeholder="0.00"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              onClick={() => setPaymentOpen(false)}
+              className="rounded-[4px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mid-navy)]"
+              style={{ borderColor: "var(--border)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitPayment()}
+              disabled={recordPayment.isPending}
+              className="rounded-[4px] bg-[color:var(--royal)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white disabled:opacity-60"
+            >
+              {recordPayment.isPending ? "Saving…" : "Record Payment"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

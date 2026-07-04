@@ -20,6 +20,7 @@ type Payload = {
   subtotal: number;
   tax_amount: number;
   total: number;
+  deposit_required: number;
 };
 
 let ITEM_SEQ = 1;
@@ -40,6 +41,7 @@ export function QuoteForm({
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(initial?.doc_date ?? new Date().toISOString().slice(0, 10));
   const [taxRate, setTaxRate] = useState<number>(initial?.tax_rate ?? 0);
+  const [depositRequired, setDepositRequired] = useState<number>(initial?.deposit_required ?? 0);
   const [items, setItems] = useState<Item[]>(
     (initial?.items ?? [{ description: "", quantity: 1, unit_price: 0, total_price: 0 }]).map((it) => ({ ...it, _id: nextId() })),
   );
@@ -126,6 +128,7 @@ export function QuoteForm({
           subtotal,
           tax_amount: taxAmount,
           total,
+          deposit_required: depositRequired,
         },
         validItems.map(({ _id, ...rest }) => rest),
         send,
@@ -322,6 +325,13 @@ export function QuoteForm({
             />
           </div>
           <Row label="Tax" value={money(taxAmount)} />
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-[color:var(--mid-navy)]">Deposit Required</span>
+            <MoneyInput
+              value={depositRequired}
+              onCommit={setDepositRequired}
+            />
+          </div>
           <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--border)" }}>
             <div className="flex items-baseline justify-between">
               <span className="label-caps">Total</span>

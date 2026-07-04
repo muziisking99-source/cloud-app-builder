@@ -6,7 +6,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
-import { money, fmtDate, DOC_LABEL } from "@/lib/format";
+import { money, fmtDate, DOC_LABEL, invoiceBalance, isInvoiceOverdue, isOpenInvoice } from "@/lib/format";
 import { FileText, Receipt, ClipboardList, Truck, ArrowRight, LayoutDashboard } from "lucide-react";
 import { AlpineEcoLogo } from "@/components/AlpineEcoLogo";
 
@@ -15,12 +15,7 @@ export const Route = createFileRoute("/")({
 });
 
 function isOverdue(d: any) {
-  return (
-    d.doc_type === "invoice" &&
-    ["unpaid", "sent", "overdue"].includes(d.status) &&
-    d.due_date &&
-    new Date(d.due_date) < new Date()
-  );
+  return isInvoiceOverdue(d);
 }
 
 function Dashboard() {
@@ -31,12 +26,12 @@ function Dashboard() {
 
   const { stats, recent } = useMemo(() => {
     const all = docs ?? [];
-    const unpaidDocs = all.filter((d: any) => d.doc_type === "invoice" && ["unpaid", "sent", "overdue"].includes(d.status));
+    const unpaidDocs = all.filter((d: any) => isOpenInvoice(d));
     return {
       stats: {
         pendingQuotes: all.filter((d: any) => d.doc_type === "quote" && ["draft", "sent"].includes(d.status)).length,
         unpaid: unpaidDocs.length,
-        unpaidTotal: unpaidDocs.reduce((s: number, d: any) => s + Number(d.total || 0), 0),
+        unpaidTotal: unpaidDocs.reduce((s: number, d: any) => s + invoiceBalance(d), 0),
         overdue: unpaidDocs.filter(isOverdue).length,
         activeJobs: all.filter((d: any) => d.doc_type === "job_card" && ["pending", "in_progress"].includes(d.status)).length,
         deliveries: all.filter((d: any) => d.doc_type === "delivery_note" && ["ready", "in_transit"].includes(d.status)).length,

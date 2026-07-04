@@ -3,14 +3,14 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { supabase } from "@/integrations/supabase/client";
-import { useDocumentsByType, useUpdateStatus } from "@/lib/queries";
+import { useDocumentsByType, useUpdateStatus, useMarkInvoicePaid } from "@/lib/queries";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TabBar } from "@/components/TabBar";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useDebounced } from "@/hooks/useDebounced";
-import { money, fmtDate, DOC_LABEL } from "@/lib/format";
+import { money, fmtDate, DOC_LABEL, isInvoiceOverdue } from "@/lib/format";
 import { generatePDF } from "@/lib/pdf";
 import { Eye, FileDown, ArrowRightCircle, CheckCircle2, Search, FileText, XCircle } from "lucide-react";
 
@@ -28,12 +28,7 @@ type Props = {
 };
 
 function isOverdue(d: any) {
-  return (
-    d.doc_type === "invoice" &&
-    ["unpaid", "sent", "overdue"].includes(d.status) &&
-    d.due_date &&
-    new Date(d.due_date) < new Date()
-  );
+  return isInvoiceOverdue(d);
 }
 
 export function DocumentList({ docType, title, tabs, newHref, detailBase, initialTab, onConvert, convertLabel, markPaid, markDelivered }: Props) {
@@ -45,6 +40,7 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
 
   const { data: docs = [], isPending } = useDocumentsByType(docType);
   const updateStatus = useUpdateStatus();
+  const markInvoicePaid = useMarkInvoicePaid();
 
   const tabCounts = useMemo(() => {
     const c: Record<string, number> = { all: docs.length };
@@ -220,7 +216,7 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
                             convertLabel={convertLabel}
                             markPaid={markPaid}
                             markDelivered={markDelivered}
-                            onMarkPaid={() => updateStatus.mutate({ id: d.id, status: "paid", docNumber: d.doc_number })}
+                            onMarkPaid={() => markInvoicePaid.mutate({ doc: d })}
                             onCancel={() => cancelInvoice(d)}
                             onMarkDelivered={() => updateStatus.mutate({ id: d.id, status: "delivered", docNumber: d.doc_number })}
                           />
@@ -281,7 +277,7 @@ export function DocumentList({ docType, title, tabs, newHref, detailBase, initia
                         convertLabel={convertLabel}
                         markPaid={markPaid}
                         markDelivered={markDelivered}
-                        onMarkPaid={() => updateStatus.mutate({ id: d.id, status: "paid", docNumber: d.doc_number })}
+                        onMarkPaid={() => markInvoicePaid.mutate({ doc: d })}
                         onCancel={() => cancelInvoice(d)}
                         onMarkDelivered={() => updateStatus.mutate({ id: d.id, status: "delivered", docNumber: d.doc_number })}
                         mobile

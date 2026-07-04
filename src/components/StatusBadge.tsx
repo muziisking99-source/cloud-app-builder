@@ -5,6 +5,7 @@ const MAP: Record<string, { bg: string; fg: string; dot: string }> = {
   rejected: { bg: "#fee2e2", fg: "#ef4444", dot: "#ef4444" },
   expired: { bg: "#e5e7eb", fg: "#4b5563", dot: "#6b7280" },
   unpaid: { bg: "#fef3c7", fg: "#b45309", dot: "#f59e0b" },
+  part_paid: { bg: "#dbeafe", fg: "#1d4ed8", dot: "#3b82f6" },
   paid: { bg: "#d1fae5", fg: "#1e9e5e", dot: "#1e9e5e" },
   overdue: { bg: "#fee2e2", fg: "#ef4444", dot: "#ef4444" },
   cancelled: { bg: "#e5e7eb", fg: "#4b5563", dot: "#6b7280" },
