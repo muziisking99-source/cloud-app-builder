@@ -88,6 +88,12 @@ const DANGER: [number, number, number] = [200, 40, 60];
 const OFFWHITE: [number, number, number] = [244, 247, 242];
 const WHITE: [number, number, number] = [255, 255, 255];
 const BORDER: [number, number, number] = [230, 232, 240];
+const AMBER: [number, number, number] = [245, 158, 11];
+const AMBER_LIGHT: [number, number, number] = [254, 243, 199];
+const ECO_LIGHT: [number, number, number] = [209, 250, 229];
+const ECO_DARK: [number, number, number] = [22, 101, 52];
+const DANGER_LIGHT: [number, number, number] = [254, 226, 226];
+const DANGER_DARK: [number, number, number] = [185, 28, 28];
 
 const TABLE_HEAD = {
   fillColor: ROYAL_LIGHT,
@@ -156,6 +162,29 @@ function drawBankingDetails(pdf: jsPDF, startY: number): number {
     y += 14;
   }
   return y + 8;
+}
+
+/** Full-width balance summary band for customer statements. */
+function drawStatementBalanceBand(pdf: jsPDF, W: number, startY: number, totalBalance: number): number {
+  const x = 40;
+  const w = W - 80;
+  const bandH = 52;
+  const bandY = startY + 16;
+
+  pdf.setFillColor(...ROYAL);
+  pdf.roundedRect(x, bandY, w, bandH, 5, 5, "F");
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.setTextColor(...ROYAL_LIGHT);
+  pdf.text("TOTAL BALANCE DUE", x + 18, bandY + 20);
+
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(22);
+  pdf.setTextColor(...WHITE);
+  pdf.text(money(totalBalance), x + w - 18, bandY + 40, { align: "right" });
+
+  return bandY + bandH + 28;
 }
 
 /** Draw branded header; returns Y below the divider for the body section. */
@@ -248,17 +277,78 @@ function drawMeta(pdf: jsPDF, doc: Doc, W: number, topY: number): number {
   return y;
 }
 
-function drawStatusStamp(pdf: jsPDF, W: number, y: number, label: string, color: [number, number, number]) {
+type StampVariant = "paid" | "unpaid" | "part_paid" | "overdue";
+
+const STAMP_STYLES: Record<
+  StampVariant,
+  { fill: [number, number, number]; border: [number, number, number]; text: [number, number, number]; sub: string }
+> = {
+  paid: { fill: ECO_LIGHT, border: ECO, text: ECO_DARK, sub: "Payment received" },
+  unpaid: { fill: AMBER_LIGHT, border: AMBER, text: [180, 83, 9], sub: "Awaiting payment" },
+  part_paid: { fill: ROYAL_LIGHT, border: ROYAL, text: ROYAL, sub: "Partially settled" },
+  overdue: { fill: DANGER_LIGHT, border: DANGER, text: DANGER_DARK, sub: "Past due date" },
+};
+
+const STAMP_LABELS: Record<StampVariant, string> = {
+  paid: "PAID",
+  unpaid: "UNPAID",
+  part_paid: "PART PAID",
+  overdue: "OVERDUE",
+};
+
+function getInvoiceStampVariant(doc: Doc): StampVariant | null {
+  if (doc.doc_type !== "invoice") return null;
+  if (doc.status === "paid") return "paid";
+  if (doc.status === "part_paid") return "part_paid";
+  if (doc.status === "overdue") return "overdue";
+  if (doc.status === "unpaid" || doc.status === "sent") return "unpaid";
+  return null;
+}
+
+/** Branded payment-status stamp for invoices. Returns stamp height. */
+function drawPaymentStamp(pdf: jsPDF, W: number, y: number, variant: StampVariant): number {
+  const style = STAMP_STYLES[variant];
+  const label = STAMP_LABELS[variant];
+  const w = 122;
+  const h = 50;
+  const x = W - 40 - w;
+
   pdf.saveGraphicsState();
-  const x = W - 140;
-  pdf.setDrawColor(...color);
-  pdf.setTextColor(...color);
-  pdf.setLineWidth(2);
-  pdf.roundedRect(x, y, 100, 34, 4, 4, "S");
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(20);
-  pdf.text(label, x + 50, y + 23, { align: "center" });
+
+  // Soft shadow offset
+  pdf.setFillColor(220, 224, 232);
+  pdf.roundedRect(x + 2, y + 2, w, h, 7, 7, "F");
+
+  // Card fill + border
+  pdf.setFillColor(...style.fill);
+  pdf.setDrawColor(...style.border);
+  pdf.setLineWidth(1.25);
+  pdf.roundedRect(x, y, w, h, 7, 7, "FD");
+
+  // Top accent band
+  pdf.setFillColor(...style.border);
+  pdf.roundedRect(x, y, w, 5, 7, 7, "F");
+  pdf.rect(x, y + 3, w, 3, "F");
+
+  // Decorative corner dots (stamp motif)
+  pdf.setFillColor(...style.border);
+  pdf.circle(x + 10, y + h - 10, 1.8, "F");
+  pdf.circle(x + w - 10, y + h - 10, 1.8, "F");
+
+  // Main label
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(variant === "part_paid" ? 13 : 15);
+  pdf.setTextColor(...style.text);
+  pdf.text(label, x + w / 2, y + 28, { align: "center" });
+
+  // Subtitle
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(6.5);
+  pdf.setTextColor(...MUTED);
+  pdf.text(style.sub.toUpperCase(), x + w / 2, y + 40, { align: "center" });
+
   pdf.restoreGraphicsState();
+  return h;
 }
 
 function drawItemsTable(pdf: jsPDF, items: Item[], startY: number, withPricing: boolean) {
@@ -346,21 +436,69 @@ function drawTotals(pdf: jsPDF, doc: Doc, W: number, startY: number): number {
   return bandY + bandH + 8;
 }
 
-/** Deposit line on quote PDFs. */
-function drawQuoteDeposit(pdf: jsPDF, doc: Doc, startY: number): number {
+/** Deposit callout card on quote PDFs. */
+function drawQuoteDeposit(pdf: jsPDF, doc: Doc, W: number, startY: number): number {
   const deposit = Number(doc.deposit_required || 0);
   if (doc.doc_type !== "quote" || deposit <= 0) return startY;
 
+  const paid = Boolean(doc.deposit_paid);
+  const boxW = W - 80;
+  const boxH = 58;
+  const x = 40;
+
+  // Card background
+  pdf.setFillColor(...(paid ? ECO_LIGHT : OFFWHITE));
+  pdf.setDrawColor(...(paid ? ECO : BORDER));
+  pdf.setLineWidth(0.75);
+  pdf.roundedRect(x, startY, boxW, boxH, 6, 6, "FD");
+
+  // Left accent strip
+  pdf.setFillColor(...(paid ? ECO : ROYAL));
+  pdf.roundedRect(x, startY, 6, boxH, 6, 6, "F");
+  pdf.rect(x + 4, startY, 2, boxH, "F");
+
+  // Header row
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  pdf.text("DEPOSIT REQUIRED", x + 20, startY + 18);
+
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(10);
-  pdf.setTextColor(...MID);
-  pdf.text(`Deposit required: ${money(deposit)}`, 40, startY);
-  if (doc.deposit_paid) {
-    pdf.setTextColor(...ECO);
-    pdf.text("Deposit paid", 40, startY + 14);
-    return startY + 28;
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  pdf.text("Due upon acceptance of this quotation", x + 20, startY + 30);
+
+  // Amount — prominent
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(22);
+  pdf.setTextColor(...(paid ? ECO_DARK : INK));
+  pdf.text(money(deposit), x + 20, startY + 50);
+
+  // Status badge (right side)
+  const badgeW = paid ? 76 : 96;
+  const badgeH = 24;
+  const badgeX = x + boxW - badgeW - 16;
+  const badgeY = startY + (boxH - badgeH) / 2;
+
+  pdf.setFillColor(...(paid ? ECO : AMBER));
+  pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 12, 12, "F");
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.setTextColor(...WHITE);
+  pdf.text(paid ? "DEPOSIT PAID" : "AWAITING PAYMENT", badgeX + badgeW / 2, badgeY + 15, { align: "center" });
+
+  // Small checkmark dot when paid
+  if (paid) {
+    pdf.setFillColor(...WHITE);
+    pdf.circle(badgeX + 14, badgeY + badgeH / 2, 4, "F");
+    pdf.setDrawColor(...ECO_DARK);
+    pdf.setLineWidth(1);
+    pdf.line(badgeX + 12, badgeY + badgeH / 2, badgeX + 13.5, badgeY + badgeH / 2 + 3);
+    pdf.line(badgeX + 13.5, badgeY + badgeH / 2 + 3, badgeX + 17, badgeY + badgeH / 2 - 3);
   }
-  return startY + 20;
+
+  return startY + boxH + 14;
 }
 
 function drawFooter(pdf: jsPDF, W: number, terms: string) {
@@ -442,12 +580,10 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
   // Status stamp for paid/overdue invoices — sits below the customer/meta block
   // and reserves its own height so the items table starts beneath it.
   let contentBottom = Math.max(custY, metaY);
-  if (doc.doc_type === "invoice" && (doc.status === "paid" || doc.status === "overdue" || doc.status === "part_paid")) {
+  const stampVariant = getInvoiceStampVariant(doc);
+  if (stampVariant) {
     const stampY = contentBottom + 12;
-    const stampH = 34;
-    if (doc.status === "paid") drawStatusStamp(pdf, W, stampY, "PAID", ECO);
-    else if (doc.status === "part_paid") drawStatusStamp(pdf, W, stampY, "PART PAID", ROYAL);
-    else drawStatusStamp(pdf, W, stampY, "OVERDUE", DANGER);
+    const stampH = drawPaymentStamp(pdf, W, stampY, stampVariant);
     contentBottom = stampY + stampH;
   }
 
@@ -524,7 +660,7 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
     const totalsEnd = drawTotals(pdf, doc, W, endY + 24);
     let y = totalsEnd + 12;
     if (doc.doc_type === "quote") {
-      y = drawQuoteDeposit(pdf, doc, y);
+      y = drawQuoteDeposit(pdf, doc, W, y);
     }
     y = drawBankingDetails(pdf, y + 8);
 
@@ -627,19 +763,9 @@ export async function generateStatementPDF(
   });
 
   const endY = (pdf as any).lastAutoTable.finalY as number;
-  const rightX = W - 40;
-  const labelX = W - 220;
-  const bandY = endY + 24;
-  const bandH = 32;
-  pdf.setFillColor(...ROYAL);
-  pdf.roundedRect(labelX - 8, bandY, rightX - labelX + 8, bandH, 3, 3, "F");
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(14);
-  pdf.setTextColor(...WHITE);
-  pdf.text("Total Balance Due", labelX, bandY + 21);
-  pdf.text(money(totalBalance), rightX, bandY + 21, { align: "right" });
+  const afterBand = drawStatementBalanceBand(pdf, W, endY, totalBalance);
 
-  drawBankingDetails(pdf, bandY + bandH + 20);
+  drawBankingDetails(pdf, afterBand);
   drawFooter(
     pdf,
     W,
