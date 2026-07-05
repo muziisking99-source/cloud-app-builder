@@ -163,25 +163,30 @@ function drawCompanyBlock(pdf: jsPDF, x: number, startY: number): number {
 }
 
 /** Banking details — quotes and invoices only. */
-function drawBankingDetails(pdf: jsPDF, startY: number): number {
+function drawBankingDetails(
+  pdf: jsPDF,
+  startY: number,
+  opts?: { x?: number },
+): number {
+  const x = opts?.x ?? 40;
   let y = startY;
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(...MUTED);
-  pdf.text(BANKING.heading.toUpperCase(), 40, y);
+  pdf.text(BANKING.heading.toUpperCase(), x, y);
   y += 16;
 
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   pdf.setTextColor(...MID);
   const lines = [
-    BANKING.accountHolder,
+    `Account name: ${BANKING.accountHolder}`,
     BANKING.bank,
     `Account number: ${BANKING.accountNumber}`,
     `Branch Code: ${BANKING.branchCode}`,
   ];
   for (const line of lines) {
-    pdf.text(line, 40, y);
+    pdf.text(line, x, y);
     y += 14;
   }
   return y + 8;
@@ -569,8 +574,7 @@ function drawQuoteTermsBlock(pdf: jsPDF, W: number, startY: number): number {
 }
 
 /** Liability note bar at the bottom of quotation PDFs. */
-function drawQuoteLiabilityBar(pdf: jsPDF, W: number) {
-  const H = pdf.internal.pageSize.getHeight();
+function drawQuoteLiabilityBar(pdf: jsPDF, W: number, startY: number): number {
   const x = 40;
   const w = W - 80;
 
@@ -578,14 +582,14 @@ function drawQuoteLiabilityBar(pdf: jsPDF, W: number) {
   pdf.setFontSize(7);
   const lines = pdf.splitTextToSize(QUOTE_TERMS.liabilityNote, w - 24);
   const boxH = Math.max(30, lines.length * 9 + 14);
-  const boxY = H - 96 - boxH;
 
   pdf.setFillColor(...OFFWHITE);
   pdf.setDrawColor(...BORDER);
   pdf.setLineWidth(0.75);
-  pdf.roundedRect(x, boxY, w, boxH, 4, 4, "FD");
+  pdf.roundedRect(x, startY, w, boxH, 4, 4, "FD");
   pdf.setTextColor(...MID);
-  pdf.text(lines, x + 12, boxY + 11);
+  pdf.text(lines, x + 12, startY + 11);
+  return startY + boxH;
 }
 
 function drawFooter(pdf: jsPDF, W: number, terms: string) {
@@ -752,9 +756,10 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
       const sectionStart = endY + 24;
       const termsBottom = drawQuoteTermsBlock(pdf, W, sectionStart);
       const totalsBottom = drawTotals(pdf, doc, W, sectionStart);
-      y = Math.max(termsBottom, totalsBottom) + 12;
+      // Banking beside terms — right column below totals, clear of the T&C block
+      const bankingBottom = drawBankingDetails(pdf, sectionStart + 72, { x: W - 220 });
+      let y = Math.max(termsBottom, totalsBottom, bankingBottom) + 12;
       y = drawQuoteDeposit(pdf, doc, W, y);
-      y = drawBankingDetails(pdf, y + 8);
 
       if (doc.notes) {
         pdf.setFont("helvetica", "bold");
@@ -766,9 +771,19 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
         pdf.setTextColor(...MID);
         const wrapped = pdf.splitTextToSize(doc.notes, W - 80);
         pdf.text(wrapped, 40, y + 14);
+        y += 20 + wrapped.length * 12;
       }
 
-      drawQuoteLiabilityBar(pdf, W);
+      const pageFooterReserve = 72;
+      const liabilityGap = 20;
+      let liabilityY = y + liabilityGap;
+      const liabilityPreview = pdf.splitTextToSize(QUOTE_TERMS.liabilityNote, W - 104);
+      const liabilityH = Math.max(30, liabilityPreview.length * 9 + 14);
+      if (liabilityY + liabilityH > H - pageFooterReserve) {
+        pdf.addPage();
+        liabilityY = 40;
+      }
+      drawQuoteLiabilityBar(pdf, W, liabilityY);
       drawFooter(pdf, W, "");
     } else {
       const totalsEnd = drawTotals(pdf, doc, W, endY + 24);
