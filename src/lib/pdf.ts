@@ -53,10 +53,33 @@ const LOGO_DISPLAY_W = 135;
 
 const BANKING = {
   heading: "Banking Details",
-  accountHolder: "F. Mahomed",
-  bank: "Capitec",
-  accountNumber: "1582338785",
-  branchCode: "470 000",
+  accountHolder: "Alpine",
+  bank: "Capitec Bank",
+  accountNumber: "252 504 706",
+  branchCode: "470010",
+};
+
+const QUOTE_TERMS = {
+  title: "Standard Terms & Conditions",
+  intro:
+    "This Quotation is valid for 30 days from date of submission & is subject to change as follows:",
+  changeItems: [
+    "Material delivered by customer not in accordance with the specification of the quotation",
+    "Stock availability or price subsequent to this quotation",
+    "Production overtime necessitated in excess of normal working hours",
+  ],
+  paymentIntro: "Payment Terms are strictly:",
+  paymentItems: [
+    "70% deposit payable upon placement of order",
+    "Full outstanding balance before collection",
+    "All goods remain in the property of Alpine-Eco until settlement of account",
+    "Should a customer cancel an order which is in production, the deposit will be forfeited in part or in full post set-off",
+    "Production will commence once Proof has been signed off by the customer",
+    "Customer required to provide artwork in PDF format or as otherwise agreed on in writing with Alpine-Eco",
+    "Corrections and layouts are charged at standard rates and are not included in the above price",
+  ],
+  liabilityNote:
+    "Please ensure that this quotation meets your specification as Alpine-Eco will not be held liable for any errors.",
 };
 
 let cachedLogoDataUrl: string | undefined;
@@ -115,13 +138,13 @@ const TABLE_ALT = { fillColor: OFFWHITE };
 function drawCompanyBlock(pdf: jsPDF, x: number, startY: number): number {
   let y = startY;
   pdf.setFont("times", "normal");
-  pdf.setFontSize(11);
+  pdf.setFontSize(13);
   pdf.setTextColor(...INK);
   pdf.text(COMPANY.name, x, y);
-  y += 14;
+  y += 16;
 
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
+  pdf.setFontSize(9.5);
   pdf.setTextColor(...MUTED);
   const lines = [
     "22 Stevens Road",
@@ -134,7 +157,7 @@ function drawCompanyBlock(pdf: jsPDF, x: number, startY: number): number {
   ];
   for (const line of lines) {
     pdf.text(line, x, y);
-    y += 11;
+    y += 12;
   }
   return y;
 }
@@ -189,27 +212,24 @@ function drawStatementBalanceBand(pdf: jsPDF, W: number, startY: number, totalBa
 
 /** Draw branded header; returns Y below the divider for the body section. */
 function drawHeader(pdf: jsPDF, doc: Doc, W: number, logoDataUrl: string): number {
-  pdf.setFillColor(...ROYAL);
-  pdf.rect(0, 0, W, 6, "F");
-
   const logoH = LOGO_DISPLAY_W * (LOGO_NATURAL_H / LOGO_NATURAL_W);
-  const logoY = 16;
+  const logoY = 14;
   pdf.addImage(logoDataUrl, "PNG", 40, logoY, LOGO_DISPLAY_W, logoH);
 
   const textX = 40 + LOGO_DISPLAY_W + 18;
-  const companyBottom = drawCompanyBlock(pdf, textX, 26);
+  const companyBottom = drawCompanyBlock(pdf, textX, 24);
   const leftBottom = Math.max(logoY + logoH, companyBottom);
 
   // Right column — document type & meta
   pdf.setFont("times", "bold");
-  pdf.setFontSize(22);
+  pdf.setFontSize(26);
   pdf.setTextColor(...ROYAL);
-  pdf.text((DOC_LABEL[doc.doc_type] || "Document").toUpperCase(), W - 40, 54, { align: "right" });
+  pdf.text((DOC_LABEL[doc.doc_type] || "Document").toUpperCase(), W - 40, 52, { align: "right" });
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(10);
+  pdf.setFontSize(12);
   pdf.setTextColor(...MID);
   pdf.text(doc.doc_number, W - 40, 74, { align: "right" });
-  pdf.text(fmtDate(doc.doc_date), W - 40, 90, { align: "right" });
+  pdf.text(fmtDate(doc.doc_date), W - 40, 92, { align: "right" });
 
   const dividerY = Math.max(leftBottom, 100) + 14;
   pdf.setDrawColor(...ROYAL);
@@ -501,17 +521,86 @@ function drawQuoteDeposit(pdf: jsPDF, doc: Doc, W: number, startY: number): numb
   return startY + boxH + 14;
 }
 
+/** Terms & conditions block — left column beside quote totals. */
+function drawQuoteTermsBlock(pdf: jsPDF, W: number, startY: number): number {
+  const x = 40;
+  const maxW = W - 300;
+  let y = startY;
+  const lineH = 9;
+  const bulletH = 10;
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.setTextColor(...MUTED);
+  pdf.text(QUOTE_TERMS.title, x, y);
+  y += 12;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7);
+  pdf.setTextColor(...MID);
+
+  const intro = pdf.splitTextToSize(QUOTE_TERMS.intro, maxW);
+  pdf.text(intro, x, y);
+  y += intro.length * lineH + 4;
+
+  for (const item of QUOTE_TERMS.changeItems) {
+    const wrapped = pdf.splitTextToSize(`- ${item}`, maxW - 6);
+    pdf.text(wrapped, x + 4, y);
+    y += wrapped.length * bulletH;
+  }
+  y += 4;
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(7);
+  pdf.setTextColor(...MID);
+  pdf.text(QUOTE_TERMS.paymentIntro, x, y);
+  y += 10;
+
+  pdf.setFont("helvetica", "normal");
+  for (const item of QUOTE_TERMS.paymentItems) {
+    const wrapped = pdf.splitTextToSize(`- ${item}`, maxW - 6);
+    pdf.text(wrapped, x + 4, y);
+    y += wrapped.length * bulletH;
+  }
+  y += 8;
+
+  pdf.text("Signature _____________________________________", x, y);
+  return y + 12;
+}
+
+/** Liability note bar at the bottom of quotation PDFs. */
+function drawQuoteLiabilityBar(pdf: jsPDF, W: number) {
+  const H = pdf.internal.pageSize.getHeight();
+  const x = 40;
+  const w = W - 80;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7);
+  const lines = pdf.splitTextToSize(QUOTE_TERMS.liabilityNote, w - 24);
+  const boxH = Math.max(30, lines.length * 9 + 14);
+  const boxY = H - 96 - boxH;
+
+  pdf.setFillColor(...OFFWHITE);
+  pdf.setDrawColor(...BORDER);
+  pdf.setLineWidth(0.75);
+  pdf.roundedRect(x, boxY, w, boxH, 4, 4, "FD");
+  pdf.setTextColor(...MID);
+  pdf.text(lines, x + 12, boxY + 11);
+}
+
 function drawFooter(pdf: jsPDF, W: number, terms: string) {
   const H = pdf.internal.pageSize.getHeight();
   pdf.setDrawColor(...BORDER);
   pdf.setLineWidth(0.5);
   pdf.line(40, H - 68, W - 40, H - 68);
 
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  pdf.setTextColor(...MUTED);
-  const wrapped = pdf.splitTextToSize(terms, W - 80);
-  pdf.text(wrapped, 40, H - 54);
+  if (terms.trim()) {
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...MUTED);
+    const wrapped = pdf.splitTextToSize(terms, W - 80);
+    pdf.text(wrapped, 40, H - 54);
+  }
 
   const contactLine = `${COMPANY.name}  ·  ${COMPANY.address}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`;
   pdf.setFontSize(7);
@@ -657,38 +746,53 @@ export async function generatePDF(doc: Doc, items: Item[], extras?: { tasks?: Ta
   } else {
     // quote & invoice
     const endY = drawItemsTable(pdf, items, tableStart, true);
-    const totalsEnd = drawTotals(pdf, doc, W, endY + 24);
-    let y = totalsEnd + 12;
+    let y: number;
+
     if (doc.doc_type === "quote") {
+      const sectionStart = endY + 24;
+      const termsBottom = drawQuoteTermsBlock(pdf, W, sectionStart);
+      const totalsBottom = drawTotals(pdf, doc, W, sectionStart);
+      y = Math.max(termsBottom, totalsBottom) + 12;
       y = drawQuoteDeposit(pdf, doc, W, y);
-    }
-    y = drawBankingDetails(pdf, y + 8);
+      y = drawBankingDetails(pdf, y + 8);
 
-    if (doc.notes) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...MUTED);
-      pdf.text("NOTES", 40, y);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.setTextColor(...MID);
-      const wrapped = pdf.splitTextToSize(doc.notes, W - 260);
-      pdf.text(wrapped, 40, y + 14);
-      y += 20 + wrapped.length * 12;
-    }
+      if (doc.notes) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9);
+        pdf.setTextColor(...MUTED);
+        pdf.text("NOTES", 40, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(...MID);
+        const wrapped = pdf.splitTextToSize(doc.notes, W - 80);
+        pdf.text(wrapped, 40, y + 14);
+      }
 
-    if (doc.doc_type === "invoice") {
+      drawQuoteLiabilityBar(pdf, W);
+      drawFooter(pdf, W, "");
+    } else {
+      const totalsEnd = drawTotals(pdf, doc, W, endY + 24);
+      y = totalsEnd + 12;
+      y = drawBankingDetails(pdf, y + 8);
+
+      if (doc.notes) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9);
+        pdf.setTextColor(...MUTED);
+        pdf.text("NOTES", 40, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(...MID);
+        const wrapped = pdf.splitTextToSize(doc.notes, W - 260);
+        pdf.text(wrapped, 40, y + 14);
+        y += 20 + wrapped.length * 12;
+      }
+
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(9);
       pdf.setTextColor(...MUTED);
       pdf.text("Thank you for your business.", 40, y + 10);
       drawFooter(pdf, W, "Please retain this invoice for your records.");
-    } else {
-      pdf.setFont("helvetica", "italic");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...MUTED);
-      pdf.text("This quotation is valid for 30 days from the date above.", 40, y + 10);
-      drawFooter(pdf, W, "Prices exclude VAT unless stated. Acceptance authorises us to schedule production.");
     }
   }
 

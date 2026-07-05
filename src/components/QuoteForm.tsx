@@ -41,7 +41,12 @@ export function QuoteForm({
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(initial?.doc_date ?? new Date().toISOString().slice(0, 10));
   const [taxRate, setTaxRate] = useState<number>(initial?.tax_rate ?? 0);
-  const [depositRequired, setDepositRequired] = useState<number>(initial?.deposit_required ?? 0);
+  const [depositPercent, setDepositPercent] = useState<number>(() => {
+    if (initial?.deposit_required && initial?.total && Number(initial.total) > 0) {
+      return Math.round((Number(initial.deposit_required) / Number(initial.total)) * 100);
+    }
+    return 70;
+  });
   const [items, setItems] = useState<Item[]>(
     (initial?.items ?? [{ description: "", quantity: 1, unit_price: 0, total_price: 0 }]).map((it) => ({ ...it, _id: nextId() })),
   );
@@ -95,6 +100,10 @@ export function QuoteForm({
   const subtotal = items.reduce((s, it) => s + Number(it.total_price || 0), 0);
   const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
   const total = Number((subtotal + taxAmount).toFixed(2));
+  const depositRequired =
+    total > 0 && depositPercent > 0
+      ? Number(((total * depositPercent) / 100).toFixed(2))
+      : 0;
 
   const validItems = items.filter((it) => it.description.trim());
   const emailValid = !customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim());
@@ -326,12 +335,24 @@ export function QuoteForm({
           </div>
           <Row label="Tax" value={money(taxAmount)} />
           <div className="mt-2 flex items-center justify-between text-sm">
-            <span className="text-[color:var(--mid-navy)]">Deposit Required</span>
-            <MoneyInput
-              value={depositRequired}
-              onCommit={setDepositRequired}
-            />
+            <span className="text-[color:var(--mid-navy)]">Deposit %</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={depositPercent}
+                onChange={(e) => setDepositPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                className="w-16 rounded border bg-white px-2 py-1 text-right text-sm outline-none"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <span className="text-[color:var(--muted-navy)]">%</span>
+            </div>
           </div>
+          {depositPercent > 0 && (
+            <Row label="Deposit amount" value={money(depositRequired)} />
+          )}
           <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--border)" }}>
             <div className="flex items-baseline justify-between">
               <span className="label-caps">Total</span>
